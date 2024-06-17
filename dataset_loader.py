@@ -6,10 +6,10 @@ import cv2
 
 
 data_pathes = [
-    "/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Real",
-    "/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Altered/Altered-Easy",
-    "/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Altered/Altered-Hard",
-    "/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Altered/Altered-Medium"
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Real",
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Easy",
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Hard",
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium"
 ]
 images_paths = []
 classes = []

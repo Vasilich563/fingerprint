@@ -1,6 +1,7 @@
 #Author: Vodohleb04
 import numpy as np
 from PIL import Image, ImageFilter
+import cv2
 
 
 class Noiser:
@@ -29,7 +30,7 @@ class Noiser:
         return np.array(image.rotate(angle, fillcolor=1.))
 
     @staticmethod
-    def blur_image(image: np.ndarray) -> np.ndarray:
+    def blur_image(image: np.ndarray, kernel_size=(5, 5)) -> np.ndarray:
         """
         Blurs the image using BoxBlur.
 
@@ -37,26 +38,26 @@ class Noiser:
         :param blur_factor: degree of blur
         :return: ndarray [height, width, channels]
         """
-        image = Image.fromarray(image)
-        return np.array(image.filter(ImageFilter.BLUR))
+        image = np.asarray(image)
+        return cv2.blur(image, kernel_size)
 
 
 if __name__ == '__main__':
     import cv2
     import matplotlib.pyplot as plt
-    image = cv2.imread("/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Real/1__M_Left_little_finger.BMP")
+    image = cv2.imread("/home/vodohleb/PycharmProjects/dl/SOCOFing/Real/1__M_Left_little_finger.BMP")
     image = cv2.cvtColor(image, cv2.IMREAD_GRAYSCALE)[:, :, 0]
     image = (image - image.min()) / (image.max() - image.min())
 
     noised_image = Noiser.add_normal_noise(image, 0.2)
     rotated_image = Noiser.rotate_image(image, 45)
-    #blured_image = Noiser.blur_image(image)
+    blured_image = Noiser.blur_image(image)
 
     plt.figure(figsize=(100, 100))
     plt.subplot(2, 1, 1)
     plt.imshow(image.reshape(103, 96))
     plt.subplot(2, 1, 2)
-    plt.imshow(rotated_image.reshape(103, 96))
+    plt.imshow(blured_image.reshape(103, 96))
     plt.title("Processed image")
     plt.show()
 
@@ -64,7 +65,7 @@ if __name__ == '__main__':
     x_epochs = []
     y_train_losses = []
     y_val_losses = []
-    with open("/home/vodohleb/PycharmProjects/tensor_flow/fingerprint_ae_train_log.csv", 'r') as log_f:
+    with open("/home/vodohleb/PycharmProjects/dl/fingerprint_ae_train_log.csv", 'r') as log_f:
         reader = csv.reader(log_f, delimiter='|')
 
         for row in reader:

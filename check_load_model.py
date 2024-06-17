@@ -157,13 +157,13 @@ altered_images_paths = {}
 real_images_paths = {}
 
 altered_images_dir_paths = [
-    "/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Altered/Altered-Easy",
-    "/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Altered/Altered-Hard",
-    "/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Altered/Altered-Medium"
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Easy",
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Hard",
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium"
 ]
 
 # Get paths of fingerprint images
-for image_path in glob.glob("/home/vodohleb/PycharmProjects/tensor_flow/SOCOFing/Real" + "/*"):
+for image_path in glob.glob("/home/vodohleb/PycharmProjects/dl/SOCOFing/Real" + "/*"):
     match = left_index_finger_regexp.search(image_path.split("/")[-1])
     if match is not None:
         real_images_paths[match.group("number")] = image_path  # Get real fingerprints paths
