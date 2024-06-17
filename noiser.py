@@ -1,6 +1,6 @@
 #Author: Vodohleb04
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 import cv2
 
 
@@ -38,8 +38,18 @@ class Noiser:
         :param blur_factor: degree of blur
         :return: ndarray [height, width, channels]
         """
-        image = np.asarray(image)
         return cv2.blur(image, kernel_size)
+
+    @staticmethod
+    def smooth(image: np.ndarray, kernel_size=(5, 5)) -> np.ndarray:
+        """
+        Smooths the image
+
+        :param image: ndarray [height, width, channels] - normalized image
+        :param kernel_size:
+        :return: ndarray [height, width, channels]
+        """
+        return cv2.sm
 
 
 if __name__ == '__main__':
@@ -51,13 +61,23 @@ if __name__ == '__main__':
 
     noised_image = Noiser.add_normal_noise(image, 0.2)
     rotated_image = Noiser.rotate_image(image, 45)
-    blured_image = Noiser.blur_image(image)
+    blured_image1 = Noiser.blur_image(image, (5, 5))
+    blured_image2 = Noiser.blur_image(image, (10, 10))
+    blured_image3 = Noiser.blur_image(image, (25, 25))
 
     plt.figure(figsize=(100, 100))
-    plt.subplot(2, 1, 1)
+    plt.subplot(4, 1, 1)
     plt.imshow(image.reshape(103, 96))
-    plt.subplot(2, 1, 2)
-    plt.imshow(blured_image.reshape(103, 96))
+    plt.subplot(4, 1, 2)
+    plt.imshow(blured_image1.reshape(103, 96))
+    plt.title("Processed image")
+    plt.show()
+    plt.subplot(4, 1, 3)
+    plt.imshow(blured_image2.reshape(103, 96))
+    plt.title("Processed image")
+    plt.show()
+    plt.subplot(4, 1, 4)
+    plt.imshow(blured_image3.reshape(103, 96))
     plt.title("Processed image")
     plt.show()
 
