@@ -139,25 +139,49 @@ class ResNetV2(ABCResNet):
         super().__init__(block, blocks_on_section, latent_dim, groups, width_per_group, device, dtype)
 
     def forward(self, input_x):
-        input_x = f.relu_(
-            self.bn1(
-                self.conv1(input_x)
+        # input_x = f.relu_(
+        #     self.bn1(
+        #         self.conv1(input_x)
+        #     )
+        # )
+        # input_x = self.max_pool(input_x)
+        #
+        # input_x = self.section1(input_x)
+        # input_x = self.section2(input_x)
+        # input_x = self.section3(input_x)
+        # input_x = self.section4(input_x)
+        #
+        # input_x = f.dropout(input_x, 1 - self.dropout_linear_keep_p)
+        # input_x = self.avg_pool(input_x)
+        #
+        # input_x = torch.flatten(input_x, 1)
+        # input_x = self.linear_layer(input_x)
+        #
+        # return input_x
+        return self.linear_layer(
+            torch.flatten(
+                self.avg_pool(
+                    f.dropout(
+                        self.section4(
+                            self.section3(
+                                self.section2(
+                                    self.section1(
+                                        self.max_pool(
+                                            f.relu_(
+                                                self.bn1(
+                                                    self.conv1(input_x)
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+                        p=1 - self.dropout_linear_keep_p
+                    )
+                )
             )
         )
-        input_x = self.max_pool(input_x)
-
-        input_x = self.section1(input_x)
-        input_x = self.section2(input_x)
-        input_x = self.section3(input_x)
-        input_x = self.section4(input_x)
-
-        input_x = f.dropout(input_x, 1 - self.dropout_linear_keep_p)
-        input_x = self.avg_pool(input_x)
-
-        input_x = torch.flatten(input_x, 1)
-        input_x = self.linear_layer(input_x)
-
-        return input_x
 
 
 def res_net_50_v2(latent_dim, dropout_conv_keep_p=0.8, dropout_linear_keep_p=0.5, device=None, dtype=None):
