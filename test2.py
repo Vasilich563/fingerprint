@@ -366,16 +366,16 @@ with torch.no_grad():
         test_step_loss = loss_function(autoencoder(test_real_image), test_real_image)
         test_losses.append(test_step_loss)
 
-        # TODO remove
-        while shown_decoded < 5:
-            shown_decoded += 1
-            plt.imshow(autoencoder(test_real_image).reshape(105, 105, 1))
-            plt.title(f"Check, decoded: {shown_decoded}")
-            plt.show()
-
-            plt.imshow(test_real_image.reshape(105, 105, 1))
-            plt.title(f"Check, before processing: {shown_decoded}")
-            plt.show()
+        # # TODO remove
+        # while shown_decoded < 5:
+        #     shown_decoded += 1
+        #     plt.imshow(autoencoder(test_real_image).reshape(105, 105, 1))
+        #     plt.title(f"Check, decoded: {shown_decoded}")
+        #     plt.show()
+        #
+        #     plt.imshow(test_real_image.reshape(105, 105, 1))
+        #     plt.title(f"Check, before processing: {shown_decoded}")
+        #     plt.show()
 
 
         # Counting latent vectors
