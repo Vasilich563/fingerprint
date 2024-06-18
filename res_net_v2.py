@@ -179,7 +179,8 @@ class ResNetV2(ABCResNet):
                         ),
                         p=1 - self.dropout_linear_keep_p
                     )
-                )
+                ),
+                1
             )
         )
 
