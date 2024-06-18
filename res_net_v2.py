@@ -16,7 +16,7 @@ class BottleneckV2(nn.Module):
     expansion = 4
 
     def __init__(
-            self, in_channels, out_channels, dropout_conv_p,
+            self, in_channels, out_channels, dropout_conv_keep_p,
             stride=1, downsample=None, groups=1, base_width=64, dilation=1, device=None, dtype=None
     ):
         if device is None:
@@ -40,34 +40,60 @@ class BottleneckV2(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
-        self.dropout_conv_p = dropout_conv_p
+        self.dropout_conv_p = dropout_conv_keep_p
 
     def forward(self, input_x):
-        out = self.conv1(
-            f.relu_(
-                self.bn1(input_x)
+        # out = self.conv1(
+        #     f.relu_(
+        #         self.bn1(input_x)
+        #     )
+        # )
+        #
+        # out = self.conv2(
+        #     f.relu_(
+        #         self.bn2(out)
+        #     )
+        # )
+        #
+        # out = f.relu_(
+        #     self.bn3(
+        #         out
+        #     )
+        # )
+        #
+        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
+        # out = self.conv3(out)
+        #
+        # if self.downsample is not None:
+        #     input_x = self.downsample(input_x)
+        #
+        # return out + input_x
+        return (
+            input_x if self.downsample is None else self.downsample(input_x)
+            +
+            self.conv3(
+                f.dropout(
+                    f.relu_(
+                        self.bn3(
+                            self.conv2(
+                                f.relu_(
+                                    self.bn2(
+                                        self.conv1(
+                                            f.relu_(
+                                                self.bn1(
+                                                    input_x
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ),
+                    p=1 - self.dropout_conv_p
+                )
             )
         )
-
-        out = self.conv2(
-            f.relu_(
-                self.bn2(out)
-            )
-        )
-
-        out = f.relu_(
-            self.bn3(
-                out
-            )
-        )
-
-        out = f.dropout(out, 1 - self.dropout_conv_p)
-        out = self.conv3(out)
-
-        if self.downsample is not None:
-            input_x = self.downsample(input_x)
-
-        return out + input_x
 
 
 class ResNetV2(ABCResNet):

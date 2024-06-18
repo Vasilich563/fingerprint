@@ -20,8 +20,11 @@ from autoencoder_dataset_loader import CustomDataset, load_image_by_pass
 import matplotlib.pyplot as plt
 
 
+import sys # TODO remove
+
+
 COUNT_LATENT_VECTORS_FROM_REAL_IMAGE = True  # Counts latent vectors of fingerprint from real images if set to True
-FINGERPRINTS_TO_SEARCH_AMOUNT = 200
+FINGERPRINTS_TO_SEARCH_AMOUNT = 400
 LIMIT_RETURNING_VARIANTS = 3
 
 
@@ -34,7 +37,7 @@ left_index_finger_regexp = re.compile(r"^(?P<number>\d+)__(M|F)_Left_index_.*$")
 
 try:
     latent_dim = int(sys.argv[1])
-    epochs_amount = int(sys.argv[2])  # TODO set normal amount
+    epochs_amount = int(sys.argv[2])
 except Exception as exp:
     print("Error! Takes 2 positional arguments: latent_dim (int > 0) and epochs_amount (int > 0)")
     logging.error("Error! Takes 2 positional arguments: latent_dim (int > 0) and epochs_amount (int > 0)")
@@ -165,7 +168,8 @@ real_images_paths = {}
 altered_images_dir_paths = [
     "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Easy",
     "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Hard",
-    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium"
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium",
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/AlteredByMe"
 ]
 
 # Get paths of fingerprint images
@@ -204,6 +208,11 @@ for person_number, altered_images_paths in altered_images_paths_items:
         real_images_set[i] = real_images_paths[person_number]
         person_numbers[i] = person_number
         i += 1
+
+del altered_images_paths
+del real_images_paths
+del altered_images_paths_items
+
 
 train_size = int(counter * 0.65)
 test_size = int(counter * 0.25)
@@ -287,17 +296,16 @@ for epoch in range(epochs_amount):
         altered_image = altered_image.type(torch.float64).to(device)
         real_image = real_image.type(torch.float64).to(device)
 
-        processed_image = autoencoder(altered_image)
-
         # Gradient step
-        step_loss = loss_function(processed_image, real_image)
+        step_loss = loss_function(autoencoder(altered_image), real_image)
         step_loss.backward()
         optimizer.step()
         losses.append(step_loss)
 
         del altered_image
         del real_image
-        del processed_image
+        del step_loss
+
     # Validation phase of train phase
     print("\tValidation")
     logging.info("\tValidation")
@@ -307,13 +315,12 @@ for epoch in range(epochs_amount):
             val_altered_image = val_altered_image.type(torch.float64).to(device)
             val_real_image = val_real_image.type(torch.float64).to(device)
 
-            val_processed_image = autoencoder(val_altered_image)
-            step_val_loss = loss_function(val_processed_image, val_real_image)
+            step_val_loss = loss_function(autoencoder(val_altered_image), val_real_image)
             val_losses.append(step_val_loss)
 
             del val_altered_image
             del val_real_image
-            del val_processed_image
+            del step_val_loss
     print(
         f"\t\tTime spent: {datetime.datetime.now() - epoch_start}\n"
         f"\t\ttrain losses: {sum(losses) / len(losses)}\n\t\tval losses: {sum(val_losses) / len(val_losses)}"
@@ -334,6 +341,8 @@ for epoch in range(epochs_amount):
         writer = csv.writer(log_f, delimiter='|')
         writer.writerow([epoch + 1, (sum(losses) / len(losses)).item(), (sum(val_losses) / len(val_losses)).item()])
 
+    del losses
+    del val_losses
 # Testing phase
 
 autoencoder.eval()
@@ -350,25 +359,24 @@ while len(random_test_fingerprints_to_check) != FINGERPRINTS_TO_SEARCH_AMOUNT:
         random_test_fingerprints_to_check.append(fingerprint_index)
 
 with torch.no_grad():
-    # shown_decoded = 0  # TODO remove
+    shown_decoded = 0  # TODO remove
     for test_altered_image, test_real_image, test_person_number in test_loader:
         test_altered_image = test_altered_image.type(torch.float64).to(device)
         test_real_image = test_real_image.type(torch.float64).to(device)
-        test_processed_image = autoencoder(test_real_image)
-        test_step_loss = loss_function(test_processed_image, test_real_image)
+        test_step_loss = loss_function(autoencoder(test_real_image), test_real_image)
         test_losses.append(test_step_loss)
 
         # TODO remove
-        # while shown_decoded < 5:
-        #     shown_decoded += 1
-        #     plt.imshow(test_processed_image[shown_decoded].reshape(105, 105, 1))
-        #     plt.title(f"Check, decoded: {shown_decoded}")
-        #     plt.show()
-        #
-        #     plt.imshow(test_altered_image[shown_decoded].reshape(105, 105, 1))
-        #     plt.title(f"Check, before processing: {shown_decoded}")
-        #     plt.show()
-        # del test_processed_image
+        while shown_decoded < 5:
+            shown_decoded += 1
+            plt.imshow(autoencoder(test_real_image).reshape(105, 105, 1))
+            plt.title(f"Check, decoded: {shown_decoded}")
+            plt.show()
+
+            plt.imshow(test_real_image.reshape(105, 105, 1))
+            plt.title(f"Check, before processing: {shown_decoded}")
+            plt.show()
+
 
         # Counting latent vectors
         if COUNT_LATENT_VECTORS_FROM_REAL_IMAGE:
@@ -412,7 +420,7 @@ with torch.no_grad():
             altered_fingerprint_to_search,
             person_number_to_search,
             (105, 105),
-            print_results=True if iter < 3 else False
+            print_results=False#True if iter < 3 else False
         )
 
         altered_right += search(
@@ -421,7 +429,7 @@ with torch.no_grad():
             person_number_to_search,
             (105, 105),
             search_for_real=False,
-            print_results=True if 3 < iter < 6 else False
+            print_results=False#True if 3 < iter < 6 else False
         )
         del altered_fingerprint_to_search
         del real_fingerprint_to_search

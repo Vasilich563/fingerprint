@@ -60,42 +60,83 @@ class DecoderV2(nn.Module):
         )
 
     def forward(self, input_x):
-        out = self.bn1(input_x)
-        out = f.relu_(
-            self.linear1(out)
+        # out = self.bn1(input_x)
+        # out = self.linear1(out)
+        # out = f.relu_(out)
+        #
+        # out = f.dropout(out, 1 - self.dropout_linear_keep_p)
+        # out = self.linear2(out)
+        # out = f.relu_(out)
+        #
+        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
+        # out = out.view(-1, self.resize[0], self.resize[1], self.resize[2])
+        # out = self.upsample(out)
+        # out = self.conv_t1(out)
+        # out = f.relu_(out)
+        #
+        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
+        # out = self.conv_t2(out)
+        # out = f.relu_(out)
+        #
+        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
+        # out = f.relu_(
+        #     self.conv_t3(out)
+        # )
+        #
+        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
+        # out = self.conv_t4(out)
+        # out = f.relu_(out)
+        #
+        # out = self.conv_t5_sigmoid(out)
+        # out = f.sigmoid(out)
+        #
+        # return out
+        return f.sigmoid(
+            self.conv_t5_sigmoid(
+                f.relu_(
+                    self.conv_t4(
+                        f.dropout(
+                            f.relu_(
+                                self.conv_t3(
+                                    f.dropout(
+                                        f.relu_(
+                                            self.conv_t2(
+                                                f.dropout(
+                                                    f.relu_(
+                                                        self.conv_t1(
+                                                            self.upsample(
+                                                                f.dropout(
+                                                                    f.relu_(
+                                                                        self.linear2(
+                                                                            f.dropout(
+                                                                                f.relu_(
+                                                                                    self.linear1(
+                                                                                        self.bn1(input_x)
+                                                                                    )
+                                                                                ),
+                                                                                p=1 - self.dropout_linear_keep_p
+                                                                            )
+                                                                        )
+                                                                    ),
+                                                                    p=1 - self.dropout_conv_keep_p
+                                                                ).view(-1, self.resize[0], self.resize[1], self.resize[2])
+                                                            )
+                                                        )
+                                                    ),
+                                                    p=1 - self.dropout_conv_keep_p
+                                                )
+                                            )
+                                        ),
+                                        p=1 - self.dropout_conv_keep_p
+                                    )
+                                )
+                            ),
+                            p=1 - self.dropout_conv_keep_p
+                        )
+                    )
+                )
+            )
         )
-
-        out = f.dropout(out, 1 - self.dropout_linear_keep_p)
-        out = f.relu_(
-            self.linear2(out)
-        )
-
-        out = f.dropout(out, 1 - self.dropout_conv_keep_p)
-        out = out.view(-1, self.resize[0], self.resize[1], self.resize[2])
-        out = self.upsample(out)
-        out = f.relu_(
-            self.conv_t1(out)
-        )
-
-        out = f.dropout(out, 1 - self.dropout_conv_keep_p)
-        out = f.relu_(
-            self.conv_t2(out)
-        )
-
-        out = f.dropout(out, 1 - self.dropout_conv_keep_p)
-        out = f.relu_(
-            self.conv_t3(out)
-        )
-
-        out = f.dropout(out, 1 - self.dropout_conv_keep_p)
-        out = f.relu_(
-            self.conv_t4(out)
-        )
-
-        out = f.sigmoid(
-            self.conv_t5_sigmoid(out)
-        )
-        return out
 
 
 def create_decoder_v2(latent_dim, dropout_conv_keep_p=0.8, dropout_linear_keep_p=0.5, device=None, dtype=None):

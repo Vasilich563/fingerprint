@@ -40,17 +40,6 @@ class Noiser:
         """
         return cv2.blur(image, kernel_size)
 
-    @staticmethod
-    def smooth(image: np.ndarray, kernel_size=(5, 5)) -> np.ndarray:
-        """
-        Smooths the image
-
-        :param image: ndarray [height, width, channels] - normalized image
-        :param kernel_size:
-        :return: ndarray [height, width, channels]
-        """
-        return cv2.sm
-
 
 if __name__ == '__main__':
     import cv2
@@ -66,20 +55,13 @@ if __name__ == '__main__':
     blured_image3 = Noiser.blur_image(image, (25, 25))
 
     plt.figure(figsize=(100, 100))
-    plt.subplot(4, 1, 1)
+    plt.subplot(2, 1, 1)
     plt.imshow(image.reshape(103, 96))
-    plt.subplot(4, 1, 2)
+    plt.subplot(2, 1, 2)
     plt.imshow(blured_image1.reshape(103, 96))
     plt.title("Processed image")
     plt.show()
-    plt.subplot(4, 1, 3)
-    plt.imshow(blured_image2.reshape(103, 96))
-    plt.title("Processed image")
-    plt.show()
-    plt.subplot(4, 1, 4)
-    plt.imshow(blured_image3.reshape(103, 96))
-    plt.title("Processed image")
-    plt.show()
+
 
     import csv
     x_epochs = []
