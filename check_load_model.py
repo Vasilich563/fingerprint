@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 
 
 COUNT_LATENT_VECTORS_FROM_REAL_IMAGE = True  # Counts latent vectors of fingerprint from real images if set to True
-FINGERPRINTS_TO_SEARCH_AMOUNT = 200
+FINGERPRINTS_TO_SEARCH_AMOUNT = 400
 LIMIT_RETURNING_VARIANTS = 3
 
 
@@ -144,9 +144,6 @@ except Exception as exp:
     sys.exit(-1)
 
 
-# clear log file
-with open(train_log_path, 'w') as f:
-    f.write("")
 
 # Defining device (Try to connect cuda, cpu is used otherwise)
 device = define_device()
@@ -159,7 +156,8 @@ real_images_paths = {}
 altered_images_dir_paths = [
     "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Easy",
     "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Hard",
-    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium"
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium",
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/AlteredByMe"
 ]
 
 # Get paths of fingerprint images
@@ -219,9 +217,9 @@ test_loader = DataLoader(test_dataset, 1)
 
 # Init model
 encoder = ResNetV2(BottleneckV2, [3, 4, 6, 3], latent_dim=latent_dim, device=device, dtype=torch.float64, dropout_conv_keep_p=0.8, dropout_linear_keep_p=0.5)
-encoder.load_state_dict(torch.load("best_val_mse_encoder_state_dict.pt"))
+encoder.load_state_dict(torch.load("./save_weights/after_last_epoch_encoder_old_to_check_1.pt"))
 decoder = DecoderV2(latent_dim=latent_dim, dropout_conv_keep_p=0.8, dropout_linear_keep_p=0.5, device=device, dtype=torch.float64)
-decoder.load_state_dict(torch.load("best_val_mse_decoder_state_dict.pt"))
+decoder.load_state_dict(torch.load("./save_weights/after_last_epoch_decoder_old_to_check_1.pt"))
 
 encoder = encoder.to(device)
 decoder = decoder.to(device)
@@ -247,7 +245,7 @@ while len(random_test_fingerprints_to_check) != FINGERPRINTS_TO_SEARCH_AMOUNT:
 
 start = datetime.datetime.now()
 with torch.no_grad():
-    shown_decoded = 0  # TODO remove
+    j = 0  # TODO remove
     for test_altered_image, test_real_image, test_person_number in test_loader:
         test_altered_image = test_altered_image.type(torch.float64).to(device)
         test_real_image = test_real_image.type(torch.float64).to(device)
@@ -255,17 +253,16 @@ with torch.no_grad():
         test_step_loss = loss_function(test_processed_image, test_real_image)
         test_losses.append(test_step_loss)
 
-        # TODO remove
-        while shown_decoded < 5:
-            shown_decoded += 1
-            plt.imshow(test_processed_image.reshape(105, 105, 1))
-            plt.title(f"Check, decoded: {shown_decoded}")
-            plt.show()
-
-            plt.imshow(test_altered_image.reshape(105, 105, 1))
-            plt.title(f"Check, before processing: {shown_decoded}")
-            plt.show()
-        del test_processed_image
+        # # TODO remove
+        # if j < 250 and j % 50 == 4:
+        #     plt.imshow(test_processed_image.reshape(105, 105, 1))
+        #     plt.title(f"Check, decoded: {j}")
+        #     plt.show()
+        #
+        #     plt.imshow(test_altered_image.reshape(105, 105, 1))
+        #     plt.title(f"Check, before processing: {j}")
+        #     plt.show()
+        # del test_processed_image
 
         # Counting latent vectors
         if COUNT_LATENT_VECTORS_FROM_REAL_IMAGE:
@@ -278,6 +275,8 @@ with torch.no_grad():
 
         for i in range(encoded_fingerprint.shape[0]):
             latent_database_dict[test_person_number[i]] = encoded_fingerprint[i].reshape(1, -1)
+
+        j += 1
 
     print("Time spent on test: {}".format(datetime.datetime.now() - test_start))
     print("test losses: {}".format(sum(test_losses)/len(test_losses)))
