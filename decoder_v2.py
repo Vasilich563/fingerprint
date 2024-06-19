@@ -37,23 +37,33 @@ class DecoderV2(nn.Module):
         self.bn1 = nn.BatchNorm1d(latent_dim, device=device, dtype=dtype)
         self.linear1 = nn.Linear(latent_dim, 1024, device=device, dtype=dtype)
 
-        self.linear2 = nn.Linear(1024, 256 * 6 * 6, device=device, dtype=dtype)
-        self.resize = (256, 6, 6)
+        # self.linear2 = nn.Linear(1024, 256 * 6 * 6, device=device, dtype=dtype)
+        # self.resize = (256, 6, 6)
+        self.linear2 = nn.Linear(1024, 512 * 6 * 6, device=device, dtype=dtype)
+        self.resize = (512, 6, 6)
 
-        self.upsample = nn.Upsample(scale_factor=2)
 
-        self.conv_t1 = nn.ConvTranspose2d(
-            256, 512, 3, stride=1, bias=False, device=device, dtype=dtype
+        self.conv_t0 = nn.ConvTranspose2d(
+           512, 512, 5, stride=2, bias=False, device=device, dtype=dtype
         )
+        self.conv_t1 = nn.ConvTranspose2d(
+            512, 512, 3, stride=1, bias=False, device=device, dtype=dtype
+        )
+
+        # self.upsample = nn.Upsample(scale_factor=2)
+        # self.conv_t1 = nn.ConvTranspose2d(
+        #     256, 512, 3, stride=1, bias=False, device=device, dtype=dtype
+        # )
+
         self.conv_t2 = nn.ConvTranspose2d(
-            512, 256, 3, stride=1, bias=False, device=device, dtype=dtype
+            512, 256, 3, stride=1, padding=1, bias=False, device=device, dtype=dtype
         )
         self.conv_t3 = nn.ConvTranspose2d(
-            256, 128, 5,
-            stride=3, output_padding=1, padding=0, bias=False, device=device, dtype=dtype
+            256, 128, 7,
+            stride=3, output_padding=0, padding=1, bias=False, device=device, dtype=dtype
         )
         self.conv_t4 = nn.ConvTranspose2d(
-            128, 64, 3, stride=2, padding=0, bias=False, device=device, dtype=dtype
+            128, 64, 5, stride=2, padding=1, bias=False, device=device, dtype=dtype
         )
         self.conv_t5_sigmoid = nn.ConvTranspose2d(
             64, 1, 3, stride=1, bias=False, device=device, dtype=dtype
@@ -104,22 +114,28 @@ class DecoderV2(nn.Module):
                                                 f.dropout(
                                                     f.relu_(
                                                         self.conv_t1(
-                                                            self.upsample(
-                                                                f.dropout(
-                                                                    f.relu_(
-                                                                        self.linear2(
-                                                                            f.dropout(
-                                                                                f.relu_(
-                                                                                    self.linear1(
-                                                                                        self.bn1(input_x)
+                                                            f.dropout(
+                                                                f.relu_(
+                                                                    self.conv_t0(
+                                                                    # self.upsample(
+                                                                        f.dropout(
+                                                                            f.relu_(
+                                                                                self.linear2(
+                                                                                    f.dropout(
+                                                                                        f.relu_(
+                                                                                            self.linear1(
+                                                                                                self.bn1(input_x)
+                                                                                            )
+                                                                                        ),
+                                                                                        p=1 - self.dropout_linear_keep_p
                                                                                     )
-                                                                                ),
-                                                                                p=1 - self.dropout_linear_keep_p
-                                                                            )
-                                                                        )
-                                                                    ),
-                                                                    p=1 - self.dropout_conv_keep_p
-                                                                ).view(-1, self.resize[0], self.resize[1], self.resize[2])
+                                                                                )
+                                                                            ),
+                                                                            p=1 - self.dropout_conv_keep_p
+                                                                        ).view(-1, self.resize[0], self.resize[1], self.resize[2])
+                                                                    )
+                                                                # )
+                                                                ), p=1 - self.dropout_conv_keep_p
                                                             )
                                                         )
                                                     ),
