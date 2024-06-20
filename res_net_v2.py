@@ -67,6 +67,7 @@ class BottleneckV2(nn.Module):
         # input_x = drop_block2d(input_x, p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training)
         #
         # return out + input_x
+        print(self.training)
         return (
             drop_block2d(
                 input_x if self.downsample is None else self.downsample(input_x),
@@ -124,7 +125,7 @@ class ResNetV2(ABCResNet):
         if stride != 1 or in_channels != channels_on_section * block.expansion:
             downsample = nn.Sequential(
                 #nn.BatchNorm2d(in_channels, device=device, dtype=dtype),
-                conv1x1(in_channels, channels_on_section * block.expansion, stride)
+                conv1x1(in_channels, channels_on_section * block.expansion, stride, device=device, dtype=dtype)
             )
 
         blocks_of_section = nn.ModuleList()
@@ -158,7 +159,7 @@ class ResNetV2(ABCResNet):
         # input_x = f.dropout(input_x, p=1-self.dropout_linear_keep_p, training=self.training)
         # input_x = self.linear_layer(input_x)
         # return input_x
-
+        print(self.training)
         return self.linear_layer(
             f.dropout(
                 torch.flatten(
@@ -178,7 +179,8 @@ class ResNetV2(ABCResNet):
                                 )
                             )
                         )
-                    )
+                    ),
+                    1
                 ),
                 p=1 - self.dropout_linear_keep_p, training=self.training
             )
@@ -186,7 +188,7 @@ class ResNetV2(ABCResNet):
 
 
 def res_net_50_v2(
-        latent_dim, dropblock_conv_keep_p=0.8, dropblock_size=7, dropout_linear_keep_p=0.5, device=None, dtype=None
+        latent_dim, dropblock_conv_keep_p=0.8, dropblock_size=3, dropout_linear_keep_p=0.5, device=None, dtype=None
 ):
     network = ResNetV2(
         BottleneckV2, [3, 4, 6, 3], latent_dim,

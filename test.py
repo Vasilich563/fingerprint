@@ -255,7 +255,7 @@ validation_loader = DataLoader(validation_dataset, 1, shuffle=True)
 test_loader = DataLoader(test_dataset, 1)
 
 # Init model
-encoder = res_net_50(latent_dim, device, torch.float64)
+encoder = res_net_50(latent_dim, 0.8, 3, 0.5, device, torch.float64)
 decoder = create_decoder(latent_dim, device, torch.float64)
 
 autoencoder = Autoencoder(encoder, decoder)

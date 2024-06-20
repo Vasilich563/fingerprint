@@ -26,6 +26,7 @@ import sys # TODO remove
 COUNT_LATENT_VECTORS_FROM_REAL_IMAGE = True  # Counts latent vectors of fingerprint from real images if set to True
 FINGERPRINTS_TO_SEARCH_AMOUNT = 400
 LIMIT_RETURNING_VARIANTS = 3
+IMG_SHAPE_WITH_PAD = (109, 109)
 
 
 latent_database_dict = {}  # Dict to save latent vectors of fingerprints
@@ -36,8 +37,8 @@ left_index_finger_regexp = re.compile(r"^(?P<number>\d+)__(M|F)_Left_index_.*$")
 
 
 try:
-    latent_dim = int(sys.argv[1])
-    epochs_amount = int(sys.argv[2])
+    latent_dim = 100#int(sys.argv[1])
+    epochs_amount = 1#int(sys.argv[2])
 except Exception as exp:
     print("Error! Takes 2 positional arguments: latent_dim (int > 0) and epochs_amount (int > 0)")
     logging.error("Error! Takes 2 positional arguments: latent_dim (int > 0) and epochs_amount (int > 0)")
@@ -223,7 +224,7 @@ train_dataset = CustomDataset(
     y_=real_images_set[:train_size],
     numbers_=person_numbers[:train_size],
     transform=transforms.Compose([transforms.ToTensor()]),
-    padding_size=(105 - 103, 105 - 96)
+    padding_size=(IMG_SHAPE_WITH_PAD[0] - 103, IMG_SHAPE_WITH_PAD[1] - 96)
 )
 
 validation_dataset = CustomDataset(
@@ -231,7 +232,7 @@ validation_dataset = CustomDataset(
     y_=real_images_set[train_size: train_size + validation_size],
     numbers_=person_numbers[train_size: train_size + validation_size],
     transform=transforms.Compose([transforms.ToTensor()]),
-    padding_size=(105 - 103, 105 - 96)
+    padding_size=(IMG_SHAPE_WITH_PAD[0] - 103, IMG_SHAPE_WITH_PAD[1] - 96)
 )
 
 test_dataset = CustomDataset(
@@ -239,12 +240,12 @@ test_dataset = CustomDataset(
     y_=real_images_set[train_size + validation_size:],
     numbers_=person_numbers[train_size + validation_size:],
     transform=transforms.Compose([transforms.ToTensor()]),
-    padding_size=(105 - 103, 105 - 96)
+    padding_size=(IMG_SHAPE_WITH_PAD[0] - 103, IMG_SHAPE_WITH_PAD[1] - 96)
 )
 # Remove bad examples
-removed = remove_images_of_wrong_shape(train_dataset, (105, 105))
-removed += remove_images_of_wrong_shape(validation_dataset, (105, 105))
-removed += remove_images_of_wrong_shape(test_dataset, (105, 105))
+removed = remove_images_of_wrong_shape(train_dataset, (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
+removed += remove_images_of_wrong_shape(validation_dataset, (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
+removed += remove_images_of_wrong_shape(test_dataset, (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
 
 
 print(f"Altered images were removed: {removed}. Result amount of altered images: {counter - removed}")
@@ -259,13 +260,13 @@ logging.info(
 )
 
 # Creating data loaders
-train_loader = DataLoader(train_dataset, 32, shuffle=True)
+train_loader = DataLoader(train_dataset, 64, shuffle=True)
 validation_loader = DataLoader(validation_dataset, 1, shuffle=True)
 test_loader = DataLoader(test_dataset, 1)
 
 # Init model
-encoder = res_net_50_v2(latent_dim, 0.8, 0.5, device, torch.float64)
-decoder = create_decoder_v2(latent_dim, 0.8, 0.5, device, torch.float64)
+encoder = res_net_50_v2(latent_dim, 0.8, 3, 0.5, device, torch.float64)
+decoder = create_decoder_v2(latent_dim, 0.8,  0.5, device, torch.float64)
 
 autoencoder = Autoencoder(encoder, decoder)
 autoencoder = autoencoder.to(device)
@@ -359,7 +360,7 @@ while len(random_test_fingerprints_to_check) != FINGERPRINTS_TO_SEARCH_AMOUNT:
         random_test_fingerprints_to_check.append(fingerprint_index)
 
 with torch.no_grad():
-    shown_decoded = 0  # TODO remove
+    #j = 0  # TODO remove
     for test_altered_image, test_real_image, test_person_number in test_loader:
         test_altered_image = test_altered_image.type(torch.float64).to(device)
         test_real_image = test_real_image.type(torch.float64).to(device)
@@ -367,16 +368,16 @@ with torch.no_grad():
         test_losses.append(test_step_loss)
 
         # # TODO remove
-        # while shown_decoded < 5:
-        #     shown_decoded += 1
-        #     plt.imshow(autoencoder(test_real_image).reshape(105, 105, 1))
-        #     plt.title(f"Check, decoded: {shown_decoded}")
-        #     plt.show()
-        #
-        #     plt.imshow(test_real_image.reshape(105, 105, 1))
-        #     plt.title(f"Check, before processing: {shown_decoded}")
-        #     plt.show()
-
+        #if j < 90 and j % 9 == 0:
+        #    plt.imshow(autoencoder(test_real_image).reshape(IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1], 1))
+        #    plt.title(f"Check, decoded: {j}")
+        #    plt.show()
+        #    #plt.savefig(f'./saved_figs/{sys.argv[3]}_{shown_decoded}.jpg')
+        
+        #    plt.imshow(test_real_image.reshape(IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1], 1))
+        #    plt.title(f"Check, before processing: {j}")
+        #    plt.show()
+        #j += 1
 
         # Counting latent vectors
         if COUNT_LATENT_VECTORS_FROM_REAL_IMAGE:
@@ -411,15 +412,15 @@ with torch.no_grad():
         real_fingerprint_to_search = real_fingerprint_to_search.type(torch.float64).to(device)
         #person_number_to_search = person_number_to_search.type(torch.float64).to(device)
 
-        encoded_altered_fingerprint_to_search = encoder(altered_fingerprint_to_search.reshape(1, 1, 105, 105))
-        encoded_real_fingerprint_to_search = encoder(real_fingerprint_to_search.reshape(1, 1, 105, 105))
+        encoded_altered_fingerprint_to_search = encoder(altered_fingerprint_to_search.reshape(1, 1, IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
+        encoded_real_fingerprint_to_search = encoder(real_fingerprint_to_search.reshape(1, 1, IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
 
         # Search for variants for encoded altered fingerprint
         real_right += search(
             encoded_real_fingerprint_to_search,
             altered_fingerprint_to_search,
             person_number_to_search,
-            (105, 105),
+            (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]),
             print_results=False#True if iter < 3 else False
         )
 
@@ -427,7 +428,7 @@ with torch.no_grad():
             encoded_altered_fingerprint_to_search,
             altered_fingerprint_to_search,
             person_number_to_search,
-            (105, 105),
+            (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]),
             search_for_real=False,
             print_results=False#True if 3 < iter < 6 else False
         )

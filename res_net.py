@@ -44,6 +44,7 @@ class Bottleneck(nn.Module):
         self.dropblock_size = dropblock_size
 
     def forward(self, input_x):
+        print(self.training)
         out = self.conv1(input_x)
         out = f.relu_(
             self.bn1(out)
@@ -90,7 +91,7 @@ class ResNet(ABCResNet):
             stride = 1
         if stride != 1 or in_channels != channels_on_section * block.expansion:
             downsample = nn.Sequential(
-                conv1x1(in_channels, channels_on_section * block.expansion, stride),
+                conv1x1(in_channels, channels_on_section * block.expansion, stride, device=device, dtype=dtype),
                 nn.BatchNorm2d(channels_on_section * block.expansion, device=device, dtype=dtype)
             )
 
@@ -112,6 +113,7 @@ class ResNet(ABCResNet):
         return nn.Sequential(*blocks_of_section)
 
     def forward(self, input_x):
+        print(self.training)
         input_x = f.relu_(
             self.bn1(
                 self.conv1(input_x)
@@ -134,7 +136,7 @@ class ResNet(ABCResNet):
 
 
 def res_net_50(
-        latent_dim, dropblock_conv_keep_p=0.8, dropblock_size=7, dropout_linear_keep_p=0.5, device=None, dtype=None
+        latent_dim, dropblock_conv_keep_p=0.8, dropblock_size=3, dropout_linear_keep_p=0.5, device=None, dtype=None
 ):
     network = ResNet(
         Bottleneck, [3, 4, 6, 3], latent_dim, dropblock_conv_keep_p, dropblock_size, dropout_linear_keep_p,

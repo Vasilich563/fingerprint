@@ -39,12 +39,11 @@ class DecoderV2(nn.Module):
 
         # self.linear2 = nn.Linear(1024, 256 * 6 * 6, device=device, dtype=dtype)
         # self.resize = (256, 6, 6)
-        self.linear2 = nn.Linear(1024, 512 * 6 * 6, device=device, dtype=dtype)
-        self.resize = (512, 6, 6)
-
+        self.linear2 = nn.Linear(1024, 512 * 4 * 4, device=device, dtype=dtype)
+        self.resize = (512, 4, 4)
 
         self.conv_t0 = nn.ConvTranspose2d(
-           512, 512, 5, stride=2, bias=False, device=device, dtype=dtype
+           512, 512, 3, stride=1, bias=False, device=device, dtype=dtype
         )
         self.conv_t1 = nn.ConvTranspose2d(
             512, 512, 3, stride=1, bias=False, device=device, dtype=dtype
@@ -56,7 +55,7 @@ class DecoderV2(nn.Module):
         # )
 
         self.conv_t2 = nn.ConvTranspose2d(
-            512, 256, 3, stride=1, padding=1, bias=False, device=device, dtype=dtype
+            512, 256, 5, stride=2, padding=1, bias=False, device=device, dtype=dtype
         )
         self.conv_t3 = nn.ConvTranspose2d(
             256, 128, 7,
@@ -74,80 +73,88 @@ class DecoderV2(nn.Module):
         # out = self.linear1(out)
         # out = f.relu_(out)
         #
-        # out = f.dropout(out, 1 - self.dropout_linear_keep_p)
+        # out = f.dropout(out, p=1 - self.dropout_linear_keep_p, training=self.training)
         # out = self.linear2(out)
         # out = f.relu_(out)
         #
-        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
         # out = out.view(-1, self.resize[0], self.resize[1], self.resize[2])
-        # out = self.upsample(out)
+        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
+        # # out = self.upsample(out)
+        #
+        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
+        # out = self.conv_t0(out)
+        # print(f"0 {out.shape}")
+        #
+        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
+        # out = f.relu_(out)
         # out = self.conv_t1(out)
-        # out = f.relu_(out)
+        # print(f"1 {out.shape}")
         #
-        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
+        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
+        # out = f.relu_(out)
         # out = self.conv_t2(out)
+        # print(f"2 {out.shape}")
+        #
+        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
         # out = f.relu_(out)
+        # out = self.conv_t3(out)
+        # print(f"3 {out.shape}")
         #
-        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
-        # out = f.relu_(
-        #     self.conv_t3(out)
-        # )
-        #
-        # out = f.dropout(out, 1 - self.dropout_conv_keep_p)
+        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
+        # out = f.relu_(out)
         # out = self.conv_t4(out)
-        # out = f.relu_(out)
+        # print(f"4 {out.shape}")
         #
         # out = self.conv_t5_sigmoid(out)
+        # print(f"5 {out.shape}")
         # out = f.sigmoid(out)
-        #
         # return out
+
         return f.sigmoid(
             self.conv_t5_sigmoid(
-                f.relu_(
-                    self.conv_t4(
+                self.conv_t4(
+                    f.relu_(
                         f.dropout(
-                            f.relu_(
-                                self.conv_t3(
+                            self.conv_t3(
+                                f.relu_(
                                     f.dropout(
-                                        f.relu_(
-                                            self.conv_t2(
+                                        self.conv_t2(
+                                            f.relu_(
                                                 f.dropout(
-                                                    f.relu_(
-                                                        self.conv_t1(
+                                                    self.conv_t1(
+                                                        f.relu_(
                                                             f.dropout(
-                                                                f.relu_(
-                                                                    self.conv_t0(
-                                                                    # self.upsample(
-                                                                        f.dropout(
-                                                                            f.relu_(
-                                                                                self.linear2(
-                                                                                    f.dropout(
-                                                                                        f.relu_(
-                                                                                            self.linear1(
-                                                                                                self.bn1(input_x)
-                                                                                            )
-                                                                                        ),
-                                                                                        p=1 - self.dropout_linear_keep_p
-                                                                                    )
+                                                                self.conv_t0(
+                                                                    f.dropout(
+                                                                        f.relu_(
+                                                                            self.linear2(
+                                                                                f.dropout(
+                                                                                    f.relu_(
+                                                                                        self.linear1(
+                                                                                            self.bn1(input_x)
+                                                                                        )
+                                                                                    ),
+                                                                                    p=1 - self.dropout_linear_keep_p,
+                                                                                    training=self.training
                                                                                 )
-                                                                            ),
-                                                                            p=1 - self.dropout_conv_keep_p
-                                                                        ).view(-1, self.resize[0], self.resize[1], self.resize[2])
+                                                                            )
+                                                                        ).view(-1, self.resize[0], self.resize[1], self.resize[2]),
+                                                                        p=1 - self.dropout_conv_keep_p, training=self.training
                                                                     )
-                                                                # )
-                                                                ), p=1 - self.dropout_conv_keep_p
+                                                                ),
+                                                                p=1 - self.dropout_conv_keep_p, training=self.training
                                                             )
                                                         )
                                                     ),
-                                                    p=1 - self.dropout_conv_keep_p
+                                                    p=1 - self.dropout_conv_keep_p, training=self.training
                                                 )
                                             )
                                         ),
-                                        p=1 - self.dropout_conv_keep_p
+                                        p=1 - self.dropout_conv_keep_p, training=self.training
                                     )
                                 )
                             ),
-                            p=1 - self.dropout_conv_keep_p
+                            p=1 - self.dropout_conv_keep_p, training=self.training
                         )
                     )
                 )
