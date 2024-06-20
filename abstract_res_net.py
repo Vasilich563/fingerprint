@@ -52,8 +52,8 @@ class ABCResNet(nn.Module, ABC):
                 nn.init.constant_(module.bias, 0)
 
     def __init__(
-            self, block, blocks_on_section, latent_dim,
-            groups=1, width_per_group=64, device=None, dtype=None
+            self, block, blocks_on_section, latent_dim, dropblock_conv_keep_p, dropblock_size, dropout_linear_keep_p,
+            groups=1, width_per_group=64, is_v2=False, device=None, dtype=None
     ):
         if device is None:
             device = torch.device('cpu')
@@ -64,11 +64,15 @@ class ABCResNet(nn.Module, ABC):
         dilation = 1
         self.groups = groups
         self.base_width = width_per_group
+        self.dropblock_conv_keep_p = dropblock_conv_keep_p
+        self.dropblock_size = dropblock_size
+        self.dropout_linear_keep_p = dropout_linear_keep_p
 
         self.conv1 = nn.Conv2d(
             1, in_channels, kernel_size=7, stride=2, padding=3, bias=False, device=device, dtype=dtype
         )
-        self.bn1 = nn.BatchNorm2d(in_channels, device=device, dtype=dtype)
+        if not is_v2:
+            self.bn1 = nn.BatchNorm2d(in_channels, device=device, dtype=dtype)
 
         self.max_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
@@ -95,7 +99,8 @@ class ABCResNet(nn.Module, ABC):
             stride=2, groups=1, device=device, dtype=dtype
         )
         in_channels = 512 * block.expansion  # Channels on prev section * block.expansion
-
+        if is_v2:
+            self.bn1 = nn.BatchNorm2d(in_channels, device=device, dtype=dtype)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear_layer = nn.Linear(in_channels, latent_dim, device=device, dtype=dtype)
 
