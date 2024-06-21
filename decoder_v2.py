@@ -34,132 +34,163 @@ class DecoderV2(nn.Module):
         self.dropout_conv_keep_p = dropout_conv_keep_p
         self.dropout_linear_keep_p = dropout_linear_keep_p
 
+        in_conv_channels = 512
+
         self.bn1 = nn.BatchNorm1d(latent_dim, device=device, dtype=dtype)
-        self.linear1 = nn.Linear(latent_dim, 1024, device=device, dtype=dtype)
+        self.linear1 = nn.Linear(latent_dim, 256, device=device, dtype=dtype)
 
         # self.linear2 = nn.Linear(1024, 256 * 6 * 6, device=device, dtype=dtype)
         # self.resize = (256, 6, 6)
-        self.linear2 = nn.Linear(1024, 512 * 4 * 4, device=device, dtype=dtype)
-        self.resize = (512, 4, 4)
+        self.linear2 = nn.Linear(256, 1024, device=device, dtype=dtype)
 
-        self.conv_t0 = nn.ConvTranspose2d(
-           512, 512, 3, stride=1, bias=False, device=device, dtype=dtype
+        self.linear3 = nn.Linear(1024, in_conv_channels * 4 * 4, device=device, dtype=dtype)
+        self.resize = (in_conv_channels, 4, 4)
+
+        self.bn11 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t11 = nn.ConvTranspose2d(
+           in_conv_channels, in_conv_channels, 3, stride=1, padding=1, bias=False, device=device, dtype=dtype
         )
-        self.conv_t1 = nn.ConvTranspose2d(
-            512, 512, 3, stride=1, bias=False, device=device, dtype=dtype
+        self.bn12 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t12 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 5, stride=2, padding=0, bias=False, device=device, dtype=dtype
+        )
+        self.bn13 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t13 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels // 2, 3, stride=1, padding=1, bias=False, device=device, dtype=dtype
         )
 
-        # self.upsample = nn.Upsample(scale_factor=2)
-        # self.conv_t1 = nn.ConvTranspose2d(
-        #     256, 512, 3, stride=1, bias=False, device=device, dtype=dtype
-        # )
+        self.residual_conv_t1 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels // 2, 5, stride=2, padding=0, bias=False, device=device, dtype=dtype
+        )
 
-        self.conv_t2 = nn.ConvTranspose2d(
-            512, 256, 5, stride=2, padding=1, bias=False, device=device, dtype=dtype
+        in_conv_channels //= 2
+
+        self.bn21 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t21 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 3,
+            stride=1, output_padding=0, padding=1, bias=False, device=device, dtype=dtype
         )
-        self.conv_t3 = nn.ConvTranspose2d(
-            256, 128, 7,
-            stride=3, output_padding=0, padding=1, bias=False, device=device, dtype=dtype
+        self.bn22 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t22 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 5, stride=2, padding=0, bias=False, device=device, dtype=dtype
         )
-        self.conv_t4 = nn.ConvTranspose2d(
-            128, 64, 5, stride=2, padding=1, bias=False, device=device, dtype=dtype
+        self.bn23 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t23 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels // 2, 3, stride=1, padding=1, bias=False, device=device, dtype=dtype
         )
+
+        self.residual_conv_t2 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels // 2, 5, stride=2, padding=0, bias=False, device=device, dtype=dtype
+        )
+        in_conv_channels //= 2
+
+        self.bn31 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t31 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 3,
+            stride=1, output_padding=0, padding=1, bias=False, device=device, dtype=dtype
+        )
+        self.bn32 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t32 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 5, stride=2, padding=0, bias=False, device=device, dtype=dtype
+        )
+        self.bn33 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t33 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels // 2, 3, stride=1, padding=1, bias=False, device=device, dtype=dtype
+        )
+
+        self.residual_conv_t3 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels // 2, 5, stride=2, padding=0, bias=False, device=device, dtype=dtype
+        )
+        in_conv_channels //= 2
+
+        self.bn41 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t41 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 3,
+            stride=1, output_padding=0, padding=1, bias=False, device=device, dtype=dtype
+        )
+        self.bn42 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t42 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 5, stride=2, padding=0, bias=False, device=device, dtype=dtype
+        )
+        self.bn43 = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
+        self.conv_t43 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 3, stride=1, padding=1, bias=False, device=device, dtype=dtype
+        )
+
+        self.residual_conv_t4 = nn.ConvTranspose2d(
+            in_conv_channels, in_conv_channels, 5, stride=2, padding=0, bias=False, device=device, dtype=dtype
+        )
+
+        self.bn5_sigmoid = nn.BatchNorm2d(in_conv_channels, device=device, dtype=dtype)
         self.conv_t5_sigmoid = nn.ConvTranspose2d(
-            64, 1, 3, stride=1, bias=False, device=device, dtype=dtype
+            64, 1, 3, padding=1, stride=1, bias=False, device=device, dtype=dtype
         )
+
+    def _batch_drop_conv_relu(self, x, batch_layer, conv_layer):
+        x = batch_layer(x)
+        x = f.dropout(x, p=1 - self.dropout_linear_keep_p, training=self.training)
+        x = conv_layer(x)
+        x = f.relu_(x)
+        return x
+
+    def compute_block(self, x, bn1, conv_t1, bn2, conv_t2, bn3, conv_t3, residual_con=None):
+        shortcut = x
+        # print(f"0 {out.shape}")
+        out = self._batch_drop_conv_relu(x, bn1, conv_t1)
+        out = self._batch_drop_conv_relu(out, bn2, conv_t2)
+        out = self._batch_drop_conv_relu(out, bn3, conv_t3)
+        # print(f"1 {out.shape}")
+
+        if residual_con is not None:
+            shortcut = residual_con(shortcut)
+        shortcut = f.dropout(shortcut, p=1 - self.dropout_linear_keep_p, training=self.training)
+        # print(shortcut.shape)
+        return out + shortcut
 
     def forward(self, input_x):
-        # out = self.bn1(input_x)
-        # out = self.linear1(out)
-        # out = f.relu_(out)
-        #
-        # out = f.dropout(out, p=1 - self.dropout_linear_keep_p, training=self.training)
-        # out = self.linear2(out)
-        # out = f.relu_(out)
-        #
-        # out = out.view(-1, self.resize[0], self.resize[1], self.resize[2])
-        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
-        # # out = self.upsample(out)
-        #
-        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
-        # out = self.conv_t0(out)
-        # print(f"0 {out.shape}")
-        #
-        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
-        # out = f.relu_(out)
-        # out = self.conv_t1(out)
-        # print(f"1 {out.shape}")
-        #
-        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
-        # out = f.relu_(out)
-        # out = self.conv_t2(out)
-        # print(f"2 {out.shape}")
-        #
-        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
-        # out = f.relu_(out)
-        # out = self.conv_t3(out)
-        # print(f"3 {out.shape}")
-        #
-        # out = f.dropout(out, p=1 - self.dropout_conv_keep_p, training=self.training)
-        # out = f.relu_(out)
-        # out = self.conv_t4(out)
-        # print(f"4 {out.shape}")
-        #
-        # out = self.conv_t5_sigmoid(out)
-        # print(f"5 {out.shape}")
-        # out = f.sigmoid(out)
-        # return out
+        """
+        Block
 
-        return f.sigmoid(
-            self.conv_t5_sigmoid(
-                self.conv_t4(
-                    f.relu_(
-                        f.dropout(
-                            self.conv_t3(
-                                f.relu_(
-                                    f.dropout(
-                                        self.conv_t2(
-                                            f.relu_(
-                                                f.dropout(
-                                                    self.conv_t1(
-                                                        f.relu_(
-                                                            f.dropout(
-                                                                self.conv_t0(
-                                                                    f.dropout(
-                                                                        f.relu_(
-                                                                            self.linear2(
-                                                                                f.dropout(
-                                                                                    f.relu_(
-                                                                                        self.linear1(
-                                                                                            self.bn1(input_x)
-                                                                                        )
-                                                                                    ),
-                                                                                    p=1 - self.dropout_linear_keep_p,
-                                                                                    training=self.training
-                                                                                )
-                                                                            )
-                                                                        ).view(-1, self.resize[0], self.resize[1], self.resize[2]),
-                                                                        p=1 - self.dropout_conv_keep_p, training=self.training
-                                                                    )
-                                                                ),
-                                                                p=1 - self.dropout_conv_keep_p, training=self.training
-                                                            )
-                                                        )
-                                                    ),
-                                                    p=1 - self.dropout_conv_keep_p, training=self.training
-                                                )
-                                            )
-                                        ),
-                                        p=1 - self.dropout_conv_keep_p, training=self.training
-                                    )
-                                )
-                            ),
-                            p=1 - self.dropout_conv_keep_p, training=self.training
-                        )
-                    )
-                )
-            )
+        BatchNorm
+        relu
+        Conv
+        """
+        out = self.bn1(input_x)
+        out = f.dropout(out, p=1 - self.dropout_linear_keep_p, training=self.training)
+        out = self.linear1(out)
+        out = f.relu_(out)
+
+        f.dropout(out, p=1 - self.dropout_linear_keep_p, training=self.training)
+        out = self.linear2(out)
+        out = f.relu_(out)
+
+        out = f.dropout(out, p=1 - self.dropout_linear_keep_p, training=self.training)
+        out = self.linear3(out)
+        out = f.relu_(out)
+
+        out = out.view(-1, self.resize[0], self.resize[1], self.resize[2])
+        # # out = self.upsample(out)
+
+        out = self.compute_block(
+            out, self.bn11, self.conv_t11, self.bn12, self.conv_t12, self.bn13, self.conv_t13, self.residual_conv_t1
         )
+
+        out = self.compute_block(
+            out, self.bn21, self.conv_t21, self.bn22, self.conv_t22, self.bn23, self.conv_t23, self.residual_conv_t2
+        )
+
+        out = self.compute_block(
+            out, self.bn31, self.conv_t31, self.bn32, self.conv_t32, self.bn33, self.conv_t33, self.residual_conv_t3
+        )
+
+        out = self.compute_block(
+            out, self.bn41, self.conv_t41, self.bn42, self.conv_t42, self.bn43, self.conv_t43, self.residual_conv_t4
+        )
+
+        out = self.conv_t5_sigmoid(out)
+        out = f.sigmoid(out)
+        # print(f"out {out.shape}")
+        return out
 
 
 def create_decoder_v2(latent_dim, dropout_conv_keep_p=0.8, dropout_linear_keep_p=0.5, device=None, dtype=None):
