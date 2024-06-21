@@ -45,61 +45,59 @@ class BottleneckV2(nn.Module):
         self.dropblock_size = dropblock_size
 
     def forward(self, input_x):
-        # out = f.relu(
-        #     self.bn1(input_x)
-        # )
-        # out = self.conv1(out)
-        #
-        # out = f.relu_(
-        #     self.bn2(out)
-        # )
-        # out = drop_block2d(out, p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training)
-        # out = self.conv2(out)
-        #
-        # out = f.relu_(
-        #     self.bn3(out)
-        # )
-        # out = drop_block2d(out, p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training)
-        # out = self.conv3(out)
-        #
-        # if self.downsample is not None:
-        #     input_x = self.downsample(input_x)
-        # input_x = drop_block2d(input_x, p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training)
-        #
-        # return out + input_x
-        print(self.training)
-        return (
-            drop_block2d(
-                input_x if self.downsample is None else self.downsample(input_x),
-                p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training
-            )
-            +
-            self.conv3(
-                drop_block2d(
-                    f.relu_(
-                        self.bn3(
-                            self.conv2(
-                                drop_block2d(
-                                    f.relu_(
-                                        self.bn2(
-                                            self.conv1(
-                                                f.relu_(
-                                                    self.bn1(
-                                                        input_x
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    ),
-                                    p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training
-                                )
-                            )
-                        )
-                    ),
-                    p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training
-                )
-            )
+        out = f.relu(
+            self.bn1(input_x)
         )
+        out = self.conv1(out)
+
+        out = f.relu_(
+            self.bn2(out)
+        )
+        out = drop_block2d(out, p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training)
+        out = self.conv2(out)
+
+        out = f.relu_(
+            self.bn3(out)
+        )
+        out = drop_block2d(out, p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training)
+        out = self.conv3(out)
+
+        if self.downsample is not None:
+            input_x = self.downsample(input_x)
+        input_x = drop_block2d(input_x, p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training)
+        return out + input_x
+        # return (
+        #     drop_block2d(
+        #         input_x if self.downsample is None else self.downsample(input_x),
+        #         p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training
+        #     )
+        #     +
+        #     self.conv3(
+        #         drop_block2d(
+        #             f.relu_(
+        #                 self.bn3(
+        #                     self.conv2(
+        #                         drop_block2d(
+        #                             f.relu_(
+        #                                 self.bn2(
+        #                                     self.conv1(
+        #                                         f.relu_(
+        #                                             self.bn1(
+        #                                                 input_x
+        #                                             )
+        #                                         )
+        #                                     )
+        #                                 )
+        #                             ),
+        #                             p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training
+        #                         )
+        #                     )
+        #                 )
+        #             ),
+        #             p=1 - self.dropblock_conv_p, block_size=self.dropblock_size, training=self.training
+        #         )
+        #     )
+        # )
 
 
 class ResNetV2(ABCResNet):
@@ -146,45 +144,45 @@ class ResNetV2(ABCResNet):
         return nn.Sequential(*blocks_of_section)
 
     def forward(self, input_x):
-        # input_x = self.conv1(input_x)
-        # input_x = self.max_pool(input_x)
-        # input_x = self.section1(input_x)
-        # input_x = self.section2(input_x)
-        # input_x = self.section3(input_x)
-        # input_x = self.section4(input_x)
-        # input_x = f.relu_(
-        #     self.bn1(input_x)
-        # )
-        # input_x = self.avgpool(input_x)
-        # input_x = f.dropout(input_x, p=1-self.dropout_linear_keep_p, training=self.training)
-        # input_x = self.linear_layer(input_x)
-        # return input_x
-        print(self.training)
-        return self.linear_layer(
-            f.dropout(
-                torch.flatten(
-                    self.avg_pool(
-                        f.relu_(
-                            self.bn1(
-                                self.section4(
-                                    self.section3(
-                                        self.section2(
-                                            self.section1(
-                                                self.max_pool(
-                                                    self.conv1(input_x)
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    1
-                ),
-                p=1 - self.dropout_linear_keep_p, training=self.training
-            )
+        input_x = self.conv1(input_x)
+        input_x = self.max_pool(input_x)
+        input_x = self.section1(input_x)
+        input_x = self.section2(input_x)
+        input_x = self.section3(input_x)
+        input_x = self.section4(input_x)
+        input_x = f.relu_(
+            self.bn1(input_x)
         )
+        input_x = self.avg_pool(input_x)
+        input_x = torch.flatten(input_x, 1)
+        input_x = f.dropout(input_x, p=1-self.dropout_linear_keep_p, training=self.training)
+        input_x = self.linear_layer(input_x)
+        return input_x
+        # return self.linear_layer(
+        #     f.dropout(
+        #         torch.flatten(
+        #             self.avg_pool(
+        #                 f.relu_(
+        #                     self.bn1(
+        #                         self.section4(
+        #                             self.section3(
+        #                                 self.section2(
+        #                                     self.section1(
+        #                                         self.max_pool(
+        #                                             self.conv1(input_x)
+        #                                         )
+        #                                     )
+        #                                 )
+        #                             )
+        #                         )
+        #                     )
+        #                 )
+        #             ),
+        #             1
+        #         ),
+        #         p=1 - self.dropout_linear_keep_p, training=self.training
+        #     )
+        # )
 
 
 def res_net_50_v2(
