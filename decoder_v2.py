@@ -129,7 +129,7 @@ class DecoderV2(nn.Module):
     def _batch_drop_conv_relu(self, x, batch_layer, conv_layer, dropout=True):
         x = batch_layer(x)
         if dropout:
-            x = f.dropout(x, p=1 - self.dropout_linear_keep_p, training=self.training)
+            x = f.dropout(x, p=1 - self.dropout_conv_keep_p, training=self.training)
         x = conv_layer(x)
         x = f.relu_(x)
         return x
@@ -144,7 +144,7 @@ class DecoderV2(nn.Module):
 
         if residual_con is not None:
             shortcut = residual_con(shortcut)
-        shortcut = f.dropout(shortcut, p=1 - self.dropout_linear_keep_p, training=self.training)
+        shortcut = f.dropout(shortcut, p=1 - self.dropout_conv_keep_p, training=self.training)
         # print(shortcut.shape)
         return out + shortcut
 
