@@ -37,8 +37,8 @@ left_index_finger_regexp = re.compile(r"^(?P<number>\d+)__(M|F)_Left_index_.*$")
 
 
 try:
-    latent_dim = 100#int(sys.argv[1])
-    epochs_amount = 1#int(sys.argv[2])
+    latent_dim = int(sys.argv[1])
+    epochs_amount = int(sys.argv[2])
 except Exception as exp:
     print("Error! Takes 2 positional arguments: latent_dim (int > 0) and epochs_amount (int > 0)")
     logging.error("Error! Takes 2 positional arguments: latent_dim (int > 0) and epochs_amount (int > 0)")
@@ -173,12 +173,14 @@ altered_images_dir_paths = [
     "/home/vodohleb/PycharmProjects/dl/SOCOFing/AlteredByMe"
 ]
 
+
 # Get paths of fingerprint images
 for image_path in glob.glob("/home/vodohleb/PycharmProjects/dl/SOCOFing/Real" + "/*"):
     match = left_index_finger_regexp.search(image_path.split("/")[-1])
     if match is not None:
         real_images_paths[match.group("number")] = image_path  # Get real fingerprints paths
         altered_images_paths[match.group("number")] = []
+
 
 counter = 0
 for altered_images_dir_path in altered_images_dir_paths:
@@ -198,6 +200,7 @@ logging.info(f"Altered images found: {counter}")
 altered_images_set = [None for _ in range(counter)]
 real_images_set = [None for _ in range(counter)]
 person_numbers = [None for _ in range(counter)]
+
 
 # Shuffle and division on subsets (train, validation, test)
 altered_images_paths_items = list(altered_images_paths.items())
@@ -259,20 +262,22 @@ logging.info(
     f"test dataset size: {len(test_dataset)}"
 )
 
+
 # Creating data loaders
 train_loader = DataLoader(train_dataset, 64, shuffle=True)
 validation_loader = DataLoader(validation_dataset, 1, shuffle=True)
 test_loader = DataLoader(test_dataset, 1)
 
-# Init model
-encoder = res_net_50_v2(latent_dim, 0.8, 3, 0.5, device, torch.float64)
-decoder = create_decoder_v2(latent_dim, 0.8,  0.5, device, torch.float64)
 
-autoencoder = Autoencoder(encoder, decoder)
-autoencoder = autoencoder.to(device)
+# Init model
+encoder = res_net_50_v2(latent_dim, 0.8, 3, 0.5, device, torch.float32)
+decoder = create_decoder_v2(latent_dim, 0.8,  0.5, device, torch.float32)
+
+autoencoder = Autoencoder(encoder, decoder).to(device)
 
 loss_function = nn.MSELoss()
 optimizer = torch.optim.Adam(autoencoder.parameters(), lr=1e-4)
+
 
 # Train and test model
 start = datetime.datetime.now()
@@ -283,26 +288,34 @@ for epoch in range(epochs_amount):
     print(f"Epoch: {epoch + 1}/{epochs_amount}")
     print("\tTrain")
     logging.info(f"Epoch: {epoch + 1}/{epochs_amount}\n\tTrain")
-    losses = []
-    val_losses = []
+
+    losses = torch.Tensor([0.0]).type(torch.float32).to(device)
+    val_losses = torch.Tensor([0.0]).type(torch.float32).to(device)
+
     # Train phase
     i = 0
     for altered_image, real_image, _ in train_loader:
+        optimizer.zero_grad(set_to_none=True)
+
         autoencoder.train()
         i += 1
         print(f"\t\tTrain mini-batch number: {i}")
         logging.info(f"\t\tTrain mini-batch number: {i}")
-        optimizer.zero_grad()
 
-        altered_image = altered_image.type(torch.float64).to(device)
-        real_image = real_image.type(torch.float64).to(device)
+        altered_image = altered_image.type(torch.float32).to(device)
+        real_image = real_image.type(torch.float32).to(device)
+
+        decoded_image = autoencoder(altered_image)
+
 
         # Gradient step
-        step_loss = loss_function(autoencoder(altered_image), real_image)
+        step_loss = loss_function(decoded_image, real_image)
         step_loss.backward()
         optimizer.step()
-        losses.append(step_loss)
+        step_loss = step_loss.detach()
+        losses += step_loss / len(train_loader)  # mean loss
 
+        del decoded_image
         del altered_image
         del real_image
         del step_loss
@@ -313,45 +326,55 @@ for epoch in range(epochs_amount):
     with torch.no_grad():
         for val_altered_image, val_real_image, _ in validation_loader:
             autoencoder.eval()
-            val_altered_image = val_altered_image.type(torch.float64).to(device)
-            val_real_image = val_real_image.type(torch.float64).to(device)
+            val_altered_image = val_altered_image.type(torch.float32).to(device)
+            val_real_image = val_real_image.type(torch.float32).to(device)
 
-            step_val_loss = loss_function(autoencoder(val_altered_image), val_real_image)
-            val_losses.append(step_val_loss)
+            val_decoded_image = autoencoder(val_altered_image)
 
+            step_val_loss = loss_function(val_decoded_image, val_real_image)
+            step_val_loss = step_val_loss.detach()
+            val_losses += step_val_loss / len(validation_loader)
+
+            del val_decoded_image
             del val_altered_image
             del val_real_image
             del step_val_loss
     print(
         f"\t\tTime spent: {datetime.datetime.now() - epoch_start}\n"
-        f"\t\ttrain losses: {sum(losses) / len(losses)}\n\t\tval losses: {sum(val_losses) / len(val_losses)}"
+        f"\t\ttrain losses: {losses.item()}\n\t\tval losses: {val_losses.item()}"
     )
     logging.info(
         f"\t\tTime spent: {datetime.datetime.now() - epoch_start}\n"
-        f"\t\ttrain losses: {sum(losses) / len(losses)}\n\t\tval losses: {sum(val_losses) / len(val_losses)}")
+        f"\t\ttrain losses: {losses.item()}\n\t\tval losses: {val_losses.item()}")
+
 
     # Check if validation mse is the best during whole training
-    if sum(val_losses) / len(val_losses) < best_val_mse:
+    if val_losses < best_val_mse:
         # Saves model with best validation mse
-        best_val_mse = sum(val_losses) / len(val_losses)
+        best_val_mse = val_losses
         torch.save(encoder.state_dict(), "best_val_mse_encoder_state_dict.pt")
         torch.save(decoder.state_dict(), "best_val_mse_decoder_state_dict.pt")
         best_val_mse_epoch = epoch + 1
 
+
     with open(train_log_path, 'a') as log_f:
         writer = csv.writer(log_f, delimiter='|')
-        writer.writerow([epoch + 1, (sum(losses) / len(losses)).item(), (sum(val_losses) / len(val_losses)).item()])
+        writer.writerow([epoch + 1, losses.item(), val_losses.item()])
 
     del losses
     del val_losses
-# Testing phase
 
+
+# Testing phase
+del best_val_mse
 autoencoder.eval()
 
 print("Testing")
 logging.info("Testing")
 test_start = datetime.datetime.now()
-test_losses = []
+test_losses = torch.Tensor([0.0]).type(torch.float32).to(device)
+
+
 random_test_fingerprints_to_check = []
 # Define test sample to check search
 while len(random_test_fingerprints_to_check) != FINGERPRINTS_TO_SEARCH_AMOUNT:
@@ -359,13 +382,16 @@ while len(random_test_fingerprints_to_check) != FINGERPRINTS_TO_SEARCH_AMOUNT:
     if fingerprint_index not in random_test_fingerprints_to_check:
         random_test_fingerprints_to_check.append(fingerprint_index)
 
+
 with torch.no_grad():
     #j = 0  # TODO remove
     for test_altered_image, test_real_image, test_person_number in test_loader:
-        test_altered_image = test_altered_image.type(torch.float64).to(device)
-        test_real_image = test_real_image.type(torch.float64).to(device)
+        test_altered_image = test_altered_image.type(torch.float32).to(device)
+        test_real_image = test_real_image.type(torch.float32).to(device)
+
         test_step_loss = loss_function(autoencoder(test_real_image), test_real_image)
-        test_losses.append(test_step_loss)
+        test_step_loss = test_step_loss.detach()
+        test_losses += test_step_loss / len(test_loader)
 
         # # TODO remove
         #if j < 90 and j % 9 == 0:
@@ -379,6 +405,7 @@ with torch.no_grad():
         #    plt.show()
         #j += 1
 
+
         # Counting latent vectors
         if COUNT_LATENT_VECTORS_FROM_REAL_IMAGE:
             encoded_fingerprint = encoder(test_real_image)
@@ -387,18 +414,20 @@ with torch.no_grad():
 
         del test_altered_image
         del test_real_image
+        del test_step_loss
 
         for i in range(encoded_fingerprint.shape[0]):
             latent_database_dict[test_person_number[i]] = encoded_fingerprint[i].reshape(1, -1)
 
     print("\tTime spent on test: {}".format(datetime.datetime.now() - test_start))
-    print("\ttest losses: {}".format(sum(test_losses)/len(test_losses)))
+    print("\ttest losses: {}".format(test_losses.item()))
     print("Time spent at all: {}".format(datetime.datetime.now() - start))
     logging.info(
         f"\tTime spent on test: {datetime.datetime.now() - test_start}\n"
-        f"\ttest losses: {sum(test_losses) / len(test_losses)}\n"
+        f"\ttest losses: {test_losses.item()}\n"
         f"Time spent at all: {datetime.datetime.now() - start}"
     )
+
 
     # Search for fingerprints
     real_right = 0
@@ -408,9 +437,9 @@ with torch.no_grad():
         iter += 1
         altered_fingerprint_to_search, real_fingerprint_to_search, person_number_to_search = test_dataset[fingerprint_index]
 
-        altered_fingerprint_to_search = altered_fingerprint_to_search.type(torch.float64).to(device)
-        real_fingerprint_to_search = real_fingerprint_to_search.type(torch.float64).to(device)
-        #person_number_to_search = person_number_to_search.type(torch.float64).to(device)
+        altered_fingerprint_to_search = altered_fingerprint_to_search.type(torch.float32).to(device)
+        real_fingerprint_to_search = real_fingerprint_to_search.type(torch.float32).to(device)
+        #person_number_to_search = person_number_to_search.type(torch.float32).to(device)
 
         encoded_altered_fingerprint_to_search = encoder(altered_fingerprint_to_search.reshape(1, 1, IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
         encoded_real_fingerprint_to_search = encoder(real_fingerprint_to_search.reshape(1, 1, IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
