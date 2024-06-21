@@ -126,9 +126,10 @@ class DecoderV2(nn.Module):
             64, 1, 3, padding=1, stride=1, bias=False, device=device, dtype=dtype
         )
 
-    def _batch_drop_conv_relu(self, x, batch_layer, conv_layer):
+    def _batch_drop_conv_relu(self, x, batch_layer, conv_layer, dropout=True):
         x = batch_layer(x)
-        x = f.dropout(x, p=1 - self.dropout_linear_keep_p, training=self.training)
+        if dropout:
+            x = f.dropout(x, p=1 - self.dropout_linear_keep_p, training=self.training)
         x = conv_layer(x)
         x = f.relu_(x)
         return x
@@ -136,7 +137,7 @@ class DecoderV2(nn.Module):
     def compute_block(self, x, bn1, conv_t1, bn2, conv_t2, bn3, conv_t3, residual_con=None):
         shortcut = x
         # print(f"0 {out.shape}")
-        out = self._batch_drop_conv_relu(x, bn1, conv_t1)
+        out = self._batch_drop_conv_relu(x, bn1, conv_t1, dropout=False)
         out = self._batch_drop_conv_relu(out, bn2, conv_t2)
         out = self._batch_drop_conv_relu(out, bn3, conv_t3)
         # print(f"1 {out.shape}")
@@ -160,7 +161,7 @@ class DecoderV2(nn.Module):
         out = self.linear1(out)
         out = f.relu_(out)
 
-        f.dropout(out, p=1 - self.dropout_linear_keep_p, training=self.training)
+        out = f.dropout(out, p=1 - self.dropout_linear_keep_p, training=self.training)
         out = self.linear2(out)
         out = f.relu_(out)
 
