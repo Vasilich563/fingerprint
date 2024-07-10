@@ -1,40 +1,41 @@
-#Author: Vodohleb04
+# Author: Vodohleb04
 import sys
 import glob
 import re
 import csv
 import datetime
 import logging
-
 import numpy as np
 import torch
-from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from random import shuffle, randint
 
-from res_net import res_net_50
-from decoder import create_decoder
-from autoencoder import Autoencoder
-from autoencoder_dataset_loader import CustomDataset, load_image_by_pass
+from vae_decoder import create_vae_decoder
+from vae_encoder import res_net_50_v2_vae_encoder
+from variational_autoencoder import VariationalAutoencoder
+from vae_loss import VAELoss
+from dataset_loader import CustomDataset, load_image_by_pass
 import matplotlib.pyplot as plt
 
 
 COUNT_LATENT_VECTORS_FROM_REAL_IMAGE = True  # Counts latent vectors of fingerprint from real images if set to True
-FINGERPRINTS_TO_SEARCH_AMOUNT = 200
+FINGERPRINTS_TO_SEARCH_AMOUNT = 400
 LIMIT_RETURNING_VARIANTS = 3
-
+IMG_SHAPE_WITH_PAD = (109, 109)
 
 latent_database_dict = {}  # Dict to save latent vectors of fingerprints
-train_log_path = "./fingerprint_ae_train_log.csv"
-log_text_file = './fingerprint_ae_text_log.log'
+train_log_path = "./vae_fingerprint_ae_train_log.csv"
+log_text_file = './vae_fingerprint_ae_text_log.log'
 logging.basicConfig(level=logging.INFO, filename=log_text_file, filemode="w")
-left_index_finger_regexp = re.compile(r"^(?P<number>\d+)__(M|F)_Left_index_.*$")
+regexp_filename = re.compile(r"^(?P<real_filename>.+finger).*?\.BMP$")
+#regexp_filename = re.compile(r"^(?P<real_filename>\d+)__(M|F)_Left_index_.*$")
+
 
 
 try:
     latent_dim = int(sys.argv[1])
-    epochs_amount = int(sys.argv[2])  # TODO set normal amount
+    epochs_amount = int(sys.argv[2])
 except Exception as exp:
     print("Error! Takes 2 positional arguments: latent_dim (int > 0) and epochs_amount (int > 0)")
     logging.error("Error! Takes 2 positional arguments: latent_dim (int > 0) and epochs_amount (int > 0)")
@@ -79,7 +80,8 @@ def plot_log(log_path):
     plt.show()
 
 
-def search(encoded_fingerprint_to_search, fingerprints_to_search, person_number_to_search_, shape, search_for_real=True, print_results=True):
+def search(encoded_fingerprint_to_search, fingerprints_to_search, person_number_to_search_, shape, search_for_real=True,
+           print_results=True):
     def print_search_result(shape):
         plt.imshow(fingerprints_to_search.reshape(shape[0], shape[1], 1))  # Image of fingerprint to find in database
         plt.title(f"Image to search (search for {'real' if search_for_real else 'altered'})\n"
@@ -97,8 +99,9 @@ def search(encoded_fingerprint_to_search, fingerprints_to_search, person_number_
         i = 0
         for variant in variants_list:
             i += 1
-            print(f"Variant {i}, searched (search for {'real' if search_for_real else 'altered'}): {person_number_to_search_};\n\t"
-                  f"Person number from db: {variant['person_number']}; mse: {variant['mse']}")
+            print(
+                f"Variant {i}, searched (search for {'real' if search_for_real else 'altered'}): {person_number_to_search_};\n\t"
+                f"Person number from db: {variant['person_number']}; mse: {variant['mse']}")
             plt.imshow(
                 load_image_by_pass(
                     real_images_paths[variant['person_number']]
@@ -109,6 +112,7 @@ def search(encoded_fingerprint_to_search, fingerprints_to_search, person_number_
                 f" person number to search (search for {'real' if search_for_real else 'altered'}): {person_number_to_search_}"
             )
             plt.show()
+
     variants_list = []
     for variant_person_number, variant_latent_vector in latent_database_dict.items():
         mse = torch.nn.functional.mse_loss(variant_latent_vector, encoded_fingerprint_to_search)
@@ -157,7 +161,6 @@ with open(train_log_path, 'w') as f:
 # Defining device (Try to connect cuda, cpu is used otherwise)
 device = define_device()
 
-
 # Create dataset
 altered_images_paths = {}
 real_images_paths = {}
@@ -165,34 +168,42 @@ real_images_paths = {}
 altered_images_dir_paths = [
     "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Easy",
     "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Hard",
-    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium"
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium",
+    "/home/vodohleb/PycharmProjects/dl/SOCOFing/AlteredByMeNoRotation"
 ]
-
+real_counter = 0
 # Get paths of fingerprint images
 for image_path in glob.glob("/home/vodohleb/PycharmProjects/dl/SOCOFing/Real" + "/*"):
-    match = left_index_finger_regexp.search(image_path.split("/")[-1])
+    match = regexp_filename.search(image_path.split("/")[-1])
     if match is not None:
-        real_images_paths[match.group("number")] = image_path  # Get real fingerprints paths
-        altered_images_paths[match.group("number")] = []
+        real_images_paths[match.group("real_filename")] = image_path  # Get real fingerprints paths
+        altered_images_paths[match.group("real_filename")] = []
+        real_counter += 1
 
-counter = 0
+
+print(f"Real images found: {real_counter}")
+logging.info(f"Real images found: {real_counter}")
+
+
+altered_counter = 0
 for altered_images_dir_path in altered_images_dir_paths:
     for image_path in glob.glob(altered_images_dir_path + "/*"):
-        match = left_index_finger_regexp.search(image_path.split("/")[-1])
+        match = regexp_filename.search(image_path.split("/")[-1])
         if match is not None:
             try:
-                altered_images_paths[match.group("number")].append(image_path)  # Get altered fingerprint paths
-                counter += 1
+                if len(altered_images_paths[match.group("real_filename")]) < 20:
+                    altered_images_paths[match.group("real_filename")].append(image_path)  # Get altered fingerprint paths
+                    altered_counter += 1
             except KeyError:
-                print(f"filename: {image_path}, number:{match.group('number')}")
-                logging.error(f"filename: {image_path}, number:{match.group('number')}")
+                print(f"filename: {image_path}, number:{match.group('real_filename')}")
+                logging.error(f"filename: {image_path}, number:{match.group('real_filename')}")
 
-print(f"Altered images found: {counter}")
-logging.info(f"Altered images found: {counter}")
+print(f"Altered images found: {altered_counter}")
+logging.info(f"Altered images found: {altered_counter}")
 
-altered_images_set = [None for _ in range(counter)]
-real_images_set = [None for _ in range(counter)]
-person_numbers = [None for _ in range(counter)]
+altered_images_set = [None for _ in range(altered_counter)]
+real_images_set = [None for _ in range(altered_counter)]
+person_numbers = [None for _ in range(altered_counter)]
 
 # Shuffle and division on subsets (train, validation, test)
 altered_images_paths_items = list(altered_images_paths.items())
@@ -205,16 +216,21 @@ for person_number, altered_images_paths in altered_images_paths_items:
         person_numbers[i] = person_number
         i += 1
 
-train_size = int(counter * 0.65)
-test_size = int(counter * 0.25)
-validation_size = counter - train_size - test_size
+del altered_images_paths
+del real_images_paths
+del altered_images_paths_items
+
+train_size = int(altered_counter * 0.65)
+test_size = int(altered_counter * 0.25)
+validation_size = altered_counter - train_size - test_size
 
 train_dataset = CustomDataset(
     x_=altered_images_set[:train_size],
     y_=real_images_set[:train_size],
     numbers_=person_numbers[:train_size],
     transform=transforms.Compose([transforms.ToTensor()]),
-    padding_size=(105 - 103, 105 - 96)
+    padding_size=(IMG_SHAPE_WITH_PAD[0] - 103, IMG_SHAPE_WITH_PAD[1] - 96),
+    inverse=True
 )
 
 validation_dataset = CustomDataset(
@@ -222,7 +238,8 @@ validation_dataset = CustomDataset(
     y_=real_images_set[train_size: train_size + validation_size],
     numbers_=person_numbers[train_size: train_size + validation_size],
     transform=transforms.Compose([transforms.ToTensor()]),
-    padding_size=(105 - 103, 105 - 96)
+    padding_size=(IMG_SHAPE_WITH_PAD[0] - 103, IMG_SHAPE_WITH_PAD[1] - 96),
+    inverse=True
 )
 
 test_dataset = CustomDataset(
@@ -230,118 +247,137 @@ test_dataset = CustomDataset(
     y_=real_images_set[train_size + validation_size:],
     numbers_=person_numbers[train_size + validation_size:],
     transform=transforms.Compose([transforms.ToTensor()]),
-    padding_size=(105 - 103, 105 - 96)
+    padding_size=(IMG_SHAPE_WITH_PAD[0] - 103, IMG_SHAPE_WITH_PAD[1] - 96),
+    inverse=True
 )
 # Remove bad examples
-removed = remove_images_of_wrong_shape(train_dataset, (105, 105))
-removed += remove_images_of_wrong_shape(validation_dataset, (105, 105))
-removed += remove_images_of_wrong_shape(test_dataset, (105, 105))
+removed = remove_images_of_wrong_shape(train_dataset, (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
+removed += remove_images_of_wrong_shape(validation_dataset, (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
+removed += remove_images_of_wrong_shape(test_dataset, (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]))
 
-
-print(f"Altered images were removed: {removed}. Result amount of altered images: {counter - removed}")
+print(f"Altered images were removed: {removed}. Result amount of altered images: {altered_counter - removed}")
 print(f"Train dataset size: {len(train_dataset)}, "
       f"validation dataset size: {len(validation_dataset)}, "
       f"test dataset size: {len(test_dataset)}")
 logging.info(
-    f"Altered images were removed: {removed}. Result amount of altered images: {counter - removed}"
+    f"Altered images were removed: {removed}. Result amount of altered images: {altered_counter - removed}"
     f"Train dataset size: {len(train_dataset)}, "
     f"validation dataset size: {len(validation_dataset)}, "
     f"test dataset size: {len(test_dataset)}"
 )
 
 # Creating data loaders
-train_loader = DataLoader(train_dataset, 32, shuffle=True)
+train_loader = DataLoader(train_dataset, 64, shuffle=True, drop_last=True)
 validation_loader = DataLoader(validation_dataset, 1, shuffle=True)
 test_loader = DataLoader(test_dataset, 1)
 
+dropblock_conv_keep_p, dropout_conv_keep_p, dropout_linear_keep_p = 1, 1, 1
 # Init model
-encoder = res_net_50(latent_dim, 0.8, 3, 0.5, device, torch.float64)
-decoder = create_decoder(latent_dim, device, torch.float64)
+encoder = res_net_50_v2_vae_encoder(latent_dim, dropblock_conv_keep_p, [7, 5, 3, 3], dropout_linear_keep_p, device, torch.float32)
+decoder = create_vae_decoder(latent_dim, dropout_conv_keep_p,  dropout_linear_keep_p, device, torch.float32)
 
-autoencoder = Autoencoder(encoder, decoder)
-autoencoder = autoencoder.to(device)
+autoencoder = VariationalAutoencoder(encoder, decoder).to(device)
 
-loss_function = nn.MSELoss()
+loss_function = VAELoss()
 optimizer = torch.optim.Adam(autoencoder.parameters(), lr=1e-4)
 
 # Train and test model
 start = datetime.datetime.now()
-best_val_mse = torch.Tensor([1.0]).to(device)
-best_val_mse_epoch = 1
+best_val_loss = torch.Tensor([1e10]).to(device)
+best_val_loss_epoch = 1
 for epoch in range(epochs_amount):
     epoch_start = datetime.datetime.now()
     print(f"Epoch: {epoch + 1}/{epochs_amount}")
     print("\tTrain")
     logging.info(f"Epoch: {epoch + 1}/{epochs_amount}\n\tTrain")
-    losses = []
-    val_losses = []
+
+    losses = torch.Tensor([0.0]).type(torch.float32).to(device)
+    val_losses = torch.Tensor([0.0]).type(torch.float32).to(device)
+
     # Train phase
     i = 0
     for altered_image, real_image, _ in train_loader:
+        optimizer.zero_grad(set_to_none=True)
+
         autoencoder.train()
         i += 1
         print(f"\t\tTrain mini-batch number: {i}")
         logging.info(f"\t\tTrain mini-batch number: {i}")
-        optimizer.zero_grad()
 
-        altered_image = altered_image.type(torch.float64).to(device)
-        real_image = real_image.type(torch.float64).to(device)
+        altered_image = altered_image.type(torch.float32).to(device)
+        real_image = real_image.type(torch.float32).to(device)
 
-        processed_image = autoencoder(altered_image)
+        z_mean, z_logvar = encoder(altered_image)
+        z = autoencoder.reparameterize(z_mean, z_logvar)
+        decoded_image = decoder(z)
 
         # Gradient step
-        step_loss = loss_function(processed_image, real_image)
+        step_loss = loss_function(real_image, decoded_image, z_mean, z_logvar)
         step_loss.backward()
         optimizer.step()
-        losses.append(step_loss)
+        step_loss = step_loss.detach()
+        losses += step_loss / len(train_loader)  # mean loss
 
+        del decoded_image
         del altered_image
         del real_image
-        del processed_image
+        del step_loss
+
     # Validation phase of train phase
     print("\tValidation")
     logging.info("\tValidation")
     with torch.no_grad():
+
         for val_altered_image, val_real_image, _ in validation_loader:
             autoencoder.eval()
-            val_altered_image = val_altered_image.type(torch.float64).to(device)
-            val_real_image = val_real_image.type(torch.float64).to(device)
+            val_altered_image = val_altered_image.type(torch.float32).to(device)
+            val_real_image = val_real_image.type(torch.float32).to(device)
 
-            val_processed_image = autoencoder(val_altered_image)
-            step_val_loss = loss_function(val_processed_image, val_real_image)
-            val_losses.append(step_val_loss)
+            val_z_mean, val_z_logvar = encoder(val_altered_image)
+            val_z = autoencoder.reparameterize(val_z_mean, val_z_logvar)
+            val_decoded_image = decoder(val_z)
 
+            step_val_loss = loss_function(val_real_image, val_decoded_image, val_z_mean, val_z_logvar)
+
+            step_val_loss = step_val_loss.detach()
+            val_losses += step_val_loss / len(validation_loader)
+
+            del val_decoded_image
             del val_altered_image
             del val_real_image
-            del val_processed_image
+            del step_val_loss
     print(
         f"\t\tTime spent: {datetime.datetime.now() - epoch_start}\n"
-        f"\t\ttrain losses: {sum(losses) / len(losses)}\n\t\tval losses: {sum(val_losses) / len(val_losses)}"
+        f"\t\ttrain losses: {losses.item()}\n\t\tval losses: {val_losses.item()}"
     )
     logging.info(
         f"\t\tTime spent: {datetime.datetime.now() - epoch_start}\n"
-        f"\t\ttrain losses: {sum(losses) / len(losses)}\n\t\tval losses: {sum(val_losses) / len(val_losses)}")
+        f"\t\ttrain losses: {losses.item()}\n\t\tval losses: {val_losses.item()}")
 
-    # Check if validation mse is the best during whole training
-    if sum(val_losses) / len(val_losses) < best_val_mse:
-        # Saves model with best validation mse
-        best_val_mse = sum(val_losses) / len(val_losses)
-        torch.save(encoder.state_dict(), "best_val_mse_encoder_state_dict.pt")
-        torch.save(decoder.state_dict(), "best_val_mse_decoder_state_dict.pt")
-        best_val_mse_epoch = epoch + 1
+    # Check if validation loss is the best during whole training
+    if val_losses < best_val_loss:
+        # Saves model with best validation loss
+        best_val_loss = val_losses
+        torch.save(encoder.state_dict(), "vae_best_val_loss_encoder_state_dict.pt")
+        torch.save(decoder.state_dict(), "vae_best_loss_decoder_state_dict.pt")
+        best_val_loss_epoch = epoch + 1
 
     with open(train_log_path, 'a') as log_f:
         writer = csv.writer(log_f, delimiter='|')
-        writer.writerow([epoch + 1, (sum(losses) / len(losses)).item(), (sum(val_losses) / len(val_losses)).item()])
+        writer.writerow([epoch + 1, losses.item(), val_losses.item()])
+
+    del losses
+    del val_losses
 
 # Testing phase
-
+del best_val_loss
 autoencoder.eval()
 
 print("Testing")
 logging.info("Testing")
 test_start = datetime.datetime.now()
-test_losses = []
+test_losses = torch.Tensor([0.0]).type(torch.float32).to(device)
+
 random_test_fingerprints_to_check = []
 # Define test sample to check search
 while len(random_test_fingerprints_to_check) != FINGERPRINTS_TO_SEARCH_AMOUNT:
@@ -350,44 +386,55 @@ while len(random_test_fingerprints_to_check) != FINGERPRINTS_TO_SEARCH_AMOUNT:
         random_test_fingerprints_to_check.append(fingerprint_index)
 
 with torch.no_grad():
-    # shown_decoded = 0  # TODO remove
+    j = 0  # TODO remove
     for test_altered_image, test_real_image, test_person_number in test_loader:
-        test_altered_image = test_altered_image.type(torch.float64).to(device)
-        test_real_image = test_real_image.type(torch.float64).to(device)
-        test_processed_image = autoencoder(test_real_image)
-        test_step_loss = loss_function(test_processed_image, test_real_image)
-        test_losses.append(test_step_loss)
+        test_altered_image = test_altered_image.type(torch.float32).to(device)
+        test_real_image = test_real_image.type(torch.float32).to(device)
 
-        # TODO remove
-        # while shown_decoded < 5:
-        #     shown_decoded += 1
-        #     plt.imshow(test_processed_image[shown_decoded].reshape(105, 105, 1))
-        #     plt.title(f"Check, decoded: {shown_decoded}")
-        #     plt.show()
-        #
-        #     plt.imshow(test_altered_image[shown_decoded].reshape(105, 105, 1))
-        #     plt.title(f"Check, before processing: {shown_decoded}")
-        #     plt.show()
-        # del test_processed_image
+        test_z_mean, test_z_logvar = encoder(test_altered_image)
+        test_z = autoencoder.reparameterize(test_z_mean, test_z_logvar)
+        test_decoded_image = decoder(test_z)
+
+        test_step_loss = loss_function(test_real_image, test_decoded_image, test_z_mean, test_z_logvar)
+
+        test_step_loss = test_step_loss.detach()
+        test_losses += test_step_loss / len(test_loader)
+
+        # # TODO remove
+        if j < 90 and j % 9 == 0:
+           #plt.savefig(f'./saved_figs/{sys.argv[3]}_{shown_decoded}.jpg')
+
+            plt.imshow(test_real_image.cpu().reshape(IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1], 1))
+            plt.title(f"Check, before processing: {j}")
+            plt.show()
+            mean = encoder(test_real_image)[0]
+            plt.imshow(decoder(mean).cpu().reshape(IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1], 1))
+            plt.title(f"Check, decoded: {j}")
+            plt.show()
+            del mean
+        j += 1
 
         # Counting latent vectors
+
         if COUNT_LATENT_VECTORS_FROM_REAL_IMAGE:
-            encoded_fingerprint = encoder(test_real_image)
+            encoded_fingerprint_mean, _ = encoder(test_real_image)
         else:
-            encoded_fingerprint = encoder(test_altered_image)  # Only the latest fingerprint will be saved in the dictionary
+            # Only the latest fingerprint will be saved in the dictionary
+            encoded_fingerprint_mean, _ = encoder(test_altered_image)
 
         del test_altered_image
         del test_real_image
+        del test_step_loss
 
-        for i in range(encoded_fingerprint.shape[0]):
-            latent_database_dict[test_person_number[i]] = encoded_fingerprint[i].reshape(1, -1)
+        for i in range(encoded_fingerprint_mean.shape[0]):
+            latent_database_dict[test_person_number[i]] = encoded_fingerprint_mean[i].reshape(1, -1)
 
     print("\tTime spent on test: {}".format(datetime.datetime.now() - test_start))
-    print("\ttest losses: {}".format(sum(test_losses)/len(test_losses)))
+    print("\ttest losses: {}".format(test_losses.item()))
     print("Time spent at all: {}".format(datetime.datetime.now() - start))
     logging.info(
         f"\tTime spent on test: {datetime.datetime.now() - test_start}\n"
-        f"\ttest losses: {sum(test_losses) / len(test_losses)}\n"
+        f"\ttest losses: {test_losses.item()}\n"
         f"Time spent at all: {datetime.datetime.now() - start}"
     )
 
@@ -397,31 +444,36 @@ with torch.no_grad():
     iter = -1
     for fingerprint_index in random_test_fingerprints_to_check:
         iter += 1
-        altered_fingerprint_to_search, real_fingerprint_to_search, person_number_to_search = test_dataset[fingerprint_index]
+        altered_fingerprint_to_search, real_fingerprint_to_search, person_number_to_search = test_dataset[
+            fingerprint_index]
 
-        altered_fingerprint_to_search = altered_fingerprint_to_search.type(torch.float64).to(device)
-        real_fingerprint_to_search = real_fingerprint_to_search.type(torch.float64).to(device)
-        #person_number_to_search = person_number_to_search.type(torch.float64).to(device)
+        altered_fingerprint_to_search = altered_fingerprint_to_search.type(torch.float32).to(device)
+        real_fingerprint_to_search = real_fingerprint_to_search.type(torch.float32).to(device)
+        # person_number_to_search = person_number_to_search.type(torch.float32).to(device)
 
-        encoded_altered_fingerprint_to_search = encoder(altered_fingerprint_to_search.reshape(1, 1, 105, 105))
-        encoded_real_fingerprint_to_search = encoder(real_fingerprint_to_search.reshape(1, 1, 105, 105))
+        encoded_altered_fingerprint_to_search_mean, _ = encoder(
+            altered_fingerprint_to_search.reshape(1, 1, IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1])
+        )
+        encoded_real_fingerprint_to_search_mean, _ = encoder(
+            real_fingerprint_to_search.reshape(1, 1, IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1])
+        )
 
         # Search for variants for encoded altered fingerprint
         real_right += search(
-            encoded_real_fingerprint_to_search,
+            encoded_real_fingerprint_to_search_mean,
             altered_fingerprint_to_search,
             person_number_to_search,
-            (105, 105),
-            print_results=True if iter < 3 else False
+            (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]),
+            print_results=False  # True if iter < 3 else False
         )
 
         altered_right += search(
-            encoded_altered_fingerprint_to_search,
+            encoded_altered_fingerprint_to_search_mean,
             altered_fingerprint_to_search,
             person_number_to_search,
-            (105, 105),
+            (IMG_SHAPE_WITH_PAD[0], IMG_SHAPE_WITH_PAD[1]),
             search_for_real=False,
-            print_results=True if 3 < iter < 6 else False
+            print_results=False  # True if 3 < iter < 6 else False
         )
         del altered_fingerprint_to_search
         del real_fingerprint_to_search
@@ -434,9 +486,9 @@ with torch.no_grad():
         f"Real fingerprint accuracy: {real_right / len(random_test_fingerprints_to_check)}\n"
         f"Altered fingerprint accuracy: {altered_right / len(random_test_fingerprints_to_check)}"
     )
-    torch.save(encoder.state_dict(), "after_last_epoch_encoder_state_dict.pt")
-    torch.save(decoder.state_dict(), "after_last_epoch_decoder_state_dict.pt")
+    torch.save(encoder.state_dict(), "vae_after_last_epoch_encoder_state_dict.pt")
+    torch.save(decoder.state_dict(), "vae_after_last_epoch_decoder_state_dict.pt")
 
-print(f"Best validation mse is counted on epoch {best_val_mse_epoch}")
-logging.info(f"Best validation mse is counted on epoch {best_val_mse_epoch}")
+print(f"Best validation loss is counted on epoch {best_val_loss_epoch}")
+logging.info(f"Best validation loss is counted on epoch {best_val_loss_epoch}")
 plot_log(train_log_path)

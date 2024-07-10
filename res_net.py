@@ -46,13 +46,13 @@ class Bottleneck(nn.Module):
     def forward(self, input_x):
         print(self.training)
         out = self.conv1(input_x)
-        out = f.relu_(
+        out = f.leaky_relu_(
             self.bn1(out)
         )
         out = drop_block2d(out, p=1 - self.dropblock_conv_keep_p, block_size=self.dropblock_size, training=self.training)
 
         out = self.conv2(out)
-        out = f.relu_(
+        out = f.leaky_relu_(
             self.bn2(out)
         )
         out = drop_block2d(out, p=1 - self.dropblock_conv_keep_p, block_size=self.dropblock_size, training=self.training)
@@ -66,22 +66,22 @@ class Bottleneck(nn.Module):
 
         input_x = drop_block2d(input_x, p=1 - self.dropblock_conv_keep_p, block_size=self.dropblock_size, training=self.training)
 
-        return f.relu_(out + input_x)
+        return f.leaky_relu_(out + input_x)
 
 
 class ResNet(ABCResNet):
 
     def __init__(
-            self, block, blocks_on_section, latent_dim, dropblock_conv_keep_p, dropblock_size, dropout_linear_keep_p,
+            self, block, blocks_on_section, latent_dim, dropblock_conv_keep_p, dropblock_sizes, dropout_linear_keep_p,
             groups=1, width_per_group=64, device=None, dtype=None
     ):
         super().__init__(
-            block, blocks_on_section, latent_dim, dropblock_conv_keep_p, dropblock_size, dropout_linear_keep_p,
+            block, blocks_on_section, latent_dim, dropblock_conv_keep_p, dropblock_sizes, dropout_linear_keep_p,
             groups=groups, width_per_group=width_per_group, is_v2=False, device=device, dtype=dtype
         )
 
     def _make_section(
-            self, block, in_channels, channels_on_section, amount_of_blocks, dilation, base_width,
+            self, block, in_channels, channels_on_section, amount_of_blocks, dropblock_size, dilation, base_width,
             stride=1, groups=1, dilate=False, device=None, dtype=None
     ):
         downsample = None
@@ -98,7 +98,7 @@ class ResNet(ABCResNet):
         blocks_of_section = nn.ModuleList()
         blocks_of_section.append(
             block(
-                in_channels, channels_on_section, self.dropblock_conv_keep_p, self.dropblock_size, stride,
+                in_channels, channels_on_section, self.dropblock_conv_keep_p, dropblock_size, stride,
                 downsample, groups, base_width, previous_dilation, device=device, dtype=dtype
             )
         )
@@ -106,7 +106,7 @@ class ResNet(ABCResNet):
         for _ in range(1, amount_of_blocks):
             blocks_of_section.append(
                 block(
-                    in_channels, channels_on_section, self.dropblock_conv_keep_p, self.dropblock_size,
+                    in_channels, channels_on_section, self.dropblock_conv_keep_p, dropblock_size,
                     groups=groups, base_width=base_width, dilation=dilation, device=device, dtype=dtype
                 )
             )
@@ -114,7 +114,7 @@ class ResNet(ABCResNet):
 
     def forward(self, input_x):
         print(self.training)
-        input_x = f.relu_(
+        input_x = f.leaky_relu_(
             self.bn1(
                 self.conv1(input_x)
             )
@@ -136,10 +136,14 @@ class ResNet(ABCResNet):
 
 
 def res_net_50(
-        latent_dim, dropblock_conv_keep_p=0.8, dropblock_size=3, dropout_linear_keep_p=0.5, device=None, dtype=None
+        output_features, dropblock_conv_keep_p=0.8, dropblock_sizes=None, dropout_linear_keep_p=0.5, device=None, dtype=None
 ):
+    if dropblock_sizes is None:
+        dropblock_sizes = [3, 3, 3, 3]
+    if len(dropblock_sizes) != 4:
+        raise ValueError("4 dropblock sizes are required")
     network = ResNet(
-        Bottleneck, [3, 4, 6, 3], latent_dim, dropblock_conv_keep_p, dropblock_size, dropout_linear_keep_p,
+        Bottleneck, [3, 4, 6, 3], output_features, dropblock_conv_keep_p, dropblock_size, dropout_linear_keep_p,
         device=device, dtype=dtype
     )
     network.init_weights()

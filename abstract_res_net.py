@@ -38,7 +38,7 @@ class ABCResNet(nn.Module, ABC):
 
     @abstractmethod
     def _make_section(
-            self, block, in_channels, channels_on_section, amount_of_blocks, dilation, base_width,
+            self, block, in_channels, channels_on_section, amount_of_blocks, dropblock_size, dilation, base_width,
             stride=1, groups=1, dilate=False, device=None, dtype=None
     ):
         raise NotImplementedError
@@ -52,7 +52,7 @@ class ABCResNet(nn.Module, ABC):
                 nn.init.constant_(module.bias, 0)
 
     def __init__(
-            self, block, blocks_on_section, latent_dim, dropblock_conv_keep_p, dropblock_size, dropout_linear_keep_p,
+            self, block, blocks_on_section, latent_dim, dropblock_conv_keep_p, dropblock_sizes, dropout_linear_keep_p,
             groups=1, width_per_group=64, is_v2=False, device=None, dtype=None
     ):
         if device is None:
@@ -65,7 +65,6 @@ class ABCResNet(nn.Module, ABC):
         self.groups = groups
         self.base_width = width_per_group
         self.dropblock_conv_keep_p = dropblock_conv_keep_p
-        self.dropblock_size = dropblock_size
         self.dropout_linear_keep_p = dropout_linear_keep_p
 
         self.conv1 = nn.Conv2d(
@@ -77,25 +76,25 @@ class ABCResNet(nn.Module, ABC):
         self.max_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.section1 = self._make_section(
-            block, in_channels, 64, blocks_on_section[0], dilation, self.base_width,
+            block, in_channels, 64, blocks_on_section[0], dropblock_sizes[0], dilation, self.base_width,
             stride=1, groups=1, device=device, dtype=dtype
         )
         in_channels = 64 * block.expansion  # Channels on prev section * block.expansion
 
         self.section2 = self._make_section(
-            block, in_channels, 128, blocks_on_section[1], dilation, self.base_width,
+            block, in_channels, 128, blocks_on_section[1], dropblock_sizes[1], dilation, self.base_width,
             stride=2, groups=1, device=device, dtype=dtype
         )
         in_channels = 128 * block.expansion  # Channels on prev section * block.expansion
 
         self.section3 = self._make_section(
-            block, in_channels, 256, blocks_on_section[2], dilation, self.base_width,
+            block, in_channels, 256, blocks_on_section[2], dropblock_sizes[2], dilation, self.base_width,
             stride=2, groups=1, device=device, dtype=dtype
         )
         in_channels = 256 * block.expansion  # Channels on prev section * block.expansion
 
         self.section4 = self._make_section(
-            block, in_channels, 512, blocks_on_section[3], dilation, self.base_width,
+            block, in_channels, 512, blocks_on_section[3], dropblock_sizes[3], dilation, self.base_width,
             stride=2, groups=1, device=device, dtype=dtype
         )
         in_channels = 512 * block.expansion  # Channels on prev section * block.expansion
