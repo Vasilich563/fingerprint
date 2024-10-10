@@ -25,20 +25,20 @@ class VAEInterlayer(nn.Module):
 
         self.dropout_keep_p = dropout_keep_p
         self.activation_on_last_layer = activation_on_last_layer
-        self.input_bn = nn.BatchNorm1d(input_features, device=device, dtype=dtype)
+        self.input_bn = nn.BatchNorm1d(middle_layers_features[0], device=device, dtype=dtype)
         self.input_layer = nn.Linear(input_features, middle_layers_features[0], device=device, dtype=dtype)
 
         middle_layers = nn.ModuleList()
         i = 0
         while i < len(middle_layers_features) - 1:
             middle_layers.append(
-                nn.BatchNorm1d(middle_layers_features[i], device=device, dtype=dtype)
+                nn.Linear(middle_layers_features[i], middle_layers_features[i + 1], device=device, dtype=dtype)
+            )
+            middle_layers.append(
+                nn.BatchNorm1d(middle_layers_features[i + 1], device=device, dtype=dtype)
             )
             middle_layers.append(
                 nn.Dropout(1 - self.dropout_keep_p, inplace=True)
-            )
-            middle_layers.append(
-                nn.Linear(middle_layers_features[i], middle_layers_features[i + 1], device=device, dtype=dtype)
             )
             middle_layers.append(
                 nn.LeakyReLU(inplace=True)
@@ -53,9 +53,9 @@ class VAEInterlayer(nn.Module):
         """
         :returns Tuple[torch.Tensor, torch.Tensor] z_mean, z_log_var
         """
-        out = self.input_bn(x)
+        out = self.input_layer(x)
+        out = self.input_bn(out)
         out = f.dropout(out, p=1 - self.dropout_keep_p, training=self.training, inplace=True)
-        out = self.input_layer(out)
         out = f.leaky_relu_(out)
 
         out = self.middle_net(out)
