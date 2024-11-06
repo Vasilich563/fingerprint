@@ -24,14 +24,16 @@ class VAEDecoder(nn.Module):
         self._init_symmetric_weights()
         self._init_asymmetric_weights()
 
-    def __init__(self, latent_dim, dropout_conv_keep_p, dropout_linear_keep_p, device=None, dtype=None):
+    def __init__(
+        self, latent_dim, dropout_conv_transpose_keep_p, dropout_linear_keep_p, device=None, dtype=None
+    ):
         super().__init__()
         if device is None:
             device = torch.device("cpu")
         if dtype is None:
             dtype = torch.float64
 
-        self.dropout_conv_keep_p = dropout_conv_keep_p
+        self.dropout_conv_transpose_keep_p = dropout_conv_transpose_keep_p
         self.dropout_linear_keep_p = dropout_linear_keep_p
 
         in_conv_channels = 512
@@ -40,7 +42,7 @@ class VAEDecoder(nn.Module):
         self.linear1 = nn.Linear(latent_dim, 256, device=device, dtype=dtype)
 
         # self.linear2 = nn.Linear(1024, 256 * 6 * 6, device=device, dtype=dtype)
-        # self.resize = (256, 6, 6)
+        # self.resize = (256, 6, 6) 
         self.linear2 = nn.Linear(256, 1024, device=device, dtype=dtype)
 
         self.linear3 = nn.Linear(1024, in_conv_channels * 4 * 4, device=device, dtype=dtype)
@@ -130,7 +132,7 @@ class VAEDecoder(nn.Module):
     def _batch_drop_conv_relu(self, x, batch_layer, conv_layer, dropout=True):
         x = batch_layer(x)
         if dropout:
-            x = f.dropout(x, p=1 - self.dropout_conv_keep_p, training=self.training)
+            x = f.dropout(x, p=1 - self.dropout_conv_transpose_keep_p, training=self.training)
         x = conv_layer(x)
         x = f.leaky_relu_(x)
         return x
@@ -145,7 +147,7 @@ class VAEDecoder(nn.Module):
         #if residual_con is not None:
         #    shortcut = x
         #    shortcut = residual_con(shortcut)
-        #    shortcut = f.dropout(shortcut, p=1 - self.dropout_conv_keep_p, training=self.training)
+        #    shortcut = f.dropout(shortcut, p=1 - self.dropout_conv_transpose_keep_p, training=self.training)
         # print(shortcut.shape)
         #    return out + shortcut
         #else:
@@ -198,8 +200,12 @@ class VAEDecoder(nn.Module):
         return out
 
 
-def create_vae_decoder(latent_dim, dropout_conv_keep_p=0.8, dropout_linear_keep_p=0.5, device=None, dtype=None):
-    decoder = VAEDecoder(latent_dim, dropout_conv_keep_p, dropout_linear_keep_p, device=device, dtype=dtype)
+def create_vae_decoder(
+        latent_dim, dropout_conv_transpose_keep_p=0.8, dropout_linear_keep_p=0.5, device=None, dtype=None
+    ):
+    decoder = VAEDecoder(
+        latent_dim, dropout_conv_transpose_keep_p, dropout_linear_keep_p, device=device, dtype=dtype
+    )
     decoder.init_weights()
     decoder = decoder.to(device)
     return decoder

@@ -12,10 +12,10 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from random import shuffle, randint
 
-from vae_decoder import create_vae_decoder
-from vae_encoder import res_net_50_v2_vae_encoder
-from variational_autoencoder import VariationalAutoencoder
-from vae_loss import VAELoss
+from vae.vae_decoder import create_vae_decoder
+from vae.vae_encoder import res_net_50_v2_vae_encoder
+from vae.variational_autoencoder import VariationalAutoencoder
+from vae.vae_loss import VAELoss
 from dataset_loader import CustomDataset, load_image_by_pass
 
 
@@ -180,14 +180,14 @@ altered_images_paths = {}
 real_images_paths = {}
 
 altered_images_dir_paths = [
-    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Easy",
-    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Hard",
-    "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium",
-    "/home/vodohleb/PycharmProjects/dl/SOCOFing/AlteredByMeNoRotation"
+    "/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Altered/Altered-Easy",
+    "/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Altered/Altered-Hard",
+    "/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Altered/Altered-Medium",
+    "/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/AlteredByMeNoRotation"
 ]
 real_counter = 0
 # Get paths of fingerprint images
-for image_path in glob.glob("/home/vodohleb/PycharmProjects/dl/SOCOFing/Real" + "/*"):
+for image_path in glob.glob("/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Real" + "/*"):
     match = regexp_filename.search(image_path.split("/")[-1])
     if match is not None:
         real_images_paths[match.group("real_filename")] = image_path  # Get real fingerprints paths

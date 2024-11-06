@@ -1,5 +1,6 @@
 #Author: Vodohleb04
 import numpy as np
+import cv2
 from PIL import Image
 
 
@@ -43,7 +44,7 @@ class Noiser:
 if __name__ == '__main__':
     import cv2
     import matplotlib.pyplot as plt
-    image = cv2.imread("/home/vodohleb/PycharmProjects/dl/SOCOFing/Real/1__M_Left_little_finger.BMP")
+    image = cv2.imread("/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Real/1__M_Left_little_finger.BMP")
     image = cv2.cvtColor(image, cv2.IMREAD_GRAYSCALE)[:, :, 0]
     image = (image - image.min()) / (image.max() - image.min())
 
@@ -66,7 +67,7 @@ if __name__ == '__main__':
     x_epochs = []
     y_train_losses = []
     y_val_losses = []
-    with open("/home/vodohleb/PycharmProjects/dl/fingerprint_ae_train_log.csv", 'r') as log_f:
+    with open("/home/vodohleb/PycharmProjects/fingerprint/fingerprint_ae_train_log.csv", 'r') as log_f:
         reader = csv.reader(log_f, delimiter='|')
 
         for row in reader:

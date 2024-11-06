@@ -20,5 +20,18 @@ class VariationalAutoencoder(nn.Module):
         z_mean, z_logvar = self.encoder(x)
         z = self.reparameterize(z_mean, z_logvar)
         x = self.decoder(z)
-        return x
+        return x, z_mean, z_logvar
+    
+
+# async def m():
+#     import chromadb
+#     client = await chromadb.AsyncHttpClient(
+#             host="0.0.0.0", port=8000
+#         #,settings=chromadb.config.Settings(allow_reset=True, anonymized_telemetry=False)
+#     )
+#     collection = await client.get_or_create_collection(name="fingerptints", metadata={"hnsw:space": "l2"})
+#     await collection.delete(ids= (await collection.get())["ids"])
+
+# import asyncio 
+# asyncio.run(m())
 

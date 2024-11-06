@@ -3,7 +3,7 @@ import torch
 from torch import nn as nn
 from torch.nn import functional as f
 from torchvision.ops import drop_block2d
-from abstract_res_net import ABCResNet, conv1x1, conv3x3
+from res_net.abstract_res_net import ABCResNet, conv1x1, conv3x3
 
 
 class Bottleneck(nn.Module):

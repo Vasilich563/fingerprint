@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import glob
 import cv2
 import random
-import os
 
 
 def alter(image_, choice_of_action):
@@ -24,12 +23,14 @@ def alter(image_, choice_of_action):
 def random_alter_actions_on_image(image):
     one_or_multiple_actions = random.randint(0, 2)
     if one_or_multiple_actions < 2:
+        choice_of_action = random.randint(0, 1)
         image = alter(image, choice_of_action)
     else:
         alter_amount = random.randint(1, 2)
         for _ in range(alter_amount):
             choice_of_action = random.randint(0, 1)
             image = alter(image, choice_of_action)
+    return image
 
 
 def show(original_image, image):
@@ -54,15 +55,16 @@ def actions_on_file(path, altered_amount_per_file, altered_counter, files_amount
         print(f"Processing {altered_counter}/{files_amount * altered_amount_per_file}")
         
         image = random_alter_actions_on_image(image)
-        cv2.imwrite(
+        if not cv2.imwrite(
             f"/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/AlteredByMeNoRotation/{name.replace('.BMP', '')}_{i}.BMP",
             cv2.normalize(image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-        )
+        ):
+            raise ValueError(f"Error. {cv2.normalize(image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)} {f"\/home\/vodohleb\/PycharmProjects\/fingerprint\/SOCOFing\/AlteredByMeNoRotation\/{name.replace('.BMP', '')}_{i}.BMP"}")
 
-        if shown_amount < 1:
-            shown_amount += 1
-            show(original_image, image)
-
+    if shown_amount < 1:
+        shown_amount += 1
+        show(original_image, image)
+    return altered_counter, shown_amount
 
 def main():
     dirs = [
@@ -82,7 +84,10 @@ def main():
     altered_counter = 0
     for dir in dirs:
         for path in glob.glob(dir + "/*"):
-            actions_on_file(path, altered_amount_per_file, altered_counter, files_amout, shown_amount)            
+            altered_counter, shown_amount = actions_on_file(
+                path, altered_amount_per_file, altered_counter, files_amout, shown_amount
+            )            
 
 
-
+if __name__ == "__main__":
+    main()

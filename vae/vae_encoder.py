@@ -1,8 +1,8 @@
 # Author: Vodohleb04
 from torch import nn
-from res_net_v2 import res_net_50_v2
-from res_net import res_net_50
-from vae_interlayer import create_vae_interlayer
+from res_net.res_net_v2 import res_net_50_v2
+from res_net.res_net import res_net_50
+from vae.vae_interlayer import create_vae_interlayer
 
 
 class VAEEncoder(nn.Module):

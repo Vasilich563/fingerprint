@@ -72,12 +72,12 @@ if __name__ == "__main__":
     real_paths = {}
 
     data_pathes = [
-        "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Easy",
-        "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Hard",
-        "/home/vodohleb/PycharmProjects/dl/SOCOFing/Altered/Altered-Medium"
+        "/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Altered/Altered-Easy",
+        "/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Altered/Altered-Hard",
+        "/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Altered/Altered-Medium"
     ]
 
-    for path in glob.glob("/home/vodohleb/PycharmProjects/dl/SOCOFing/Real" + "/*"):
+    for path in glob.glob("/home/vodohleb/PycharmProjects/fingerprint/SOCOFing/Real" + "/*"):
         match = re.search(r"^(?P<number>\d+)__(M|F)_Left_index_.*$", path.split("/")[-1])
         if match is not None:
             real_paths[match.group("number")] = path
